@@ -3,3 +3,4 @@
 *.pdb
 wikigen_auth
 client
+.env
