@@ -1,0 +1,11 @@
+---
+triple:          'arm64-apple-darwin'
+binary-path:     wikigen_auth
+relocations:
+  - { offset: 0x26, size: 0x8, addend: 0x0, symName: _main, symObjAddr: 0x0, symBinAddr: 0x1000072D8, symSize: 0x1BC }
+  - { offset: 0x95, size: 0x8, addend: 0x0, symName: _main, symObjAddr: 0x0, symBinAddr: 0x1000072D8, symSize: 0x1BC }
+  - { offset: 0x197, size: 0x8, addend: 0x0, symName: _handle_client, symObjAddr: 0x1BC, symBinAddr: 0x100007494, symSize: 0x1F4 }
+  - { offset: 0x286, size: 0x8, addend: 0x0, symName: _handle_get_requests, symObjAddr: 0x3B0, symBinAddr: 0x100007688, symSize: 0x58 }
+  - { offset: 0x2D4, size: 0x8, addend: 0x0, symName: _handle_post_requests, symObjAddr: 0x408, symBinAddr: 0x1000076E0, symSize: 0x58 }
+  - { offset: 0x314, size: 0x8, addend: 0x0, symName: _authorize, symObjAddr: 0x460, symBinAddr: 0x100007738, symSize: 0x35C }
+...
