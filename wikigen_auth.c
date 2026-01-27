@@ -86,36 +86,42 @@ void *handle_client(void *arg) {
 
   ssize_t bytes_received = recv(client_fd, buffer, BUFFER_SIZE, 0);
 
-  if (bytes_received > 0) {
-    char method[7];
-    strncpy(method, buffer, 7);
+  if (bytes_received < 0) {
+    send(client_fd, "Improper Header", strlen("Improper Header"), 0);
+    free(buffer);
+    return NULL;
+  }
+  buffer[bytes_received] = '\0';
 
-    if (strstr(method, "GET") != NULL) {
-      struct URL *url = parse_url(client_fd, buffer, strlen("GET"));
-      if (url == NULL) {
-        char *error = "Invalid URL";
-        send(client_fd, error, strlen(error), 0);
-        free(url);
-        return NULL;
-      }
-      handle_get_requests(client_fd, url);
+  char method[7];
+  strncpy(method, buffer, 7);
+  method[7] = '\0';
+
+  if (strstr(method, "GET") != NULL) {
+    struct URL *url = parse_url(buffer, strlen("GET") + 1);
+    if (url == NULL) {
+      char *error = "Invalid URL";
+      send(client_fd, error, strlen(error), 0);
       free(url);
       return NULL;
-    } else if (strstr(method, "POST") != NULL) {
-      struct URL *url = parse_url(client_fd, buffer, strlen("POST"));
-      if (url == NULL) {
-        char *error = "Invalid URL";
-        send(client_fd, error, strlen(error), 0);
-        free(url);
-        return NULL;
-      }
-      handle_post_requests(client_fd, buffer);
-      return NULL;
     }
+    handle_get_requests(client_fd, url);
+    free(url);
+    return NULL;
   }
 
-  char *hello = "Improper Header";
-  send(client_fd, hello, strlen(hello), 0);
+  if (strstr(method, "POST") != NULL) {
+    struct URL *url = parse_url(buffer, strlen("POST") + 1);
+    if (url == NULL) {
+      char *error = "Invalid URL";
+      send(client_fd, error, strlen(error), 0);
+      free(url);
+      return NULL;
+    }
+    handle_post_requests(client_fd, buffer);
+    return NULL;
+  }
+
   return NULL;
 }
 
