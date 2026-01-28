@@ -94,10 +94,6 @@ void *handle_client_request(void *arg) {
   buffer[bytes_received] = '\0';
 
   struct Request *request = parse_request(buffer);
-  printf("Request: %s\n", request->method);
-  printf("Resource Path: %s\n", request->resource_path);
-  printf("Segments: %d\n", request->segment_count);
-  printf("Param Count: %d\n", request->param_count);
   if (request->error != NULL) {
     send(client_fd, request->error, strlen(request->error), 0);
     free(request);

@@ -9,8 +9,15 @@ int main(int argc, char const *argv[]) {
   int status, valread, client_fd;
   struct sockaddr_in serv_addr;
   // char* hello = "GET /authorize?code=1234 HTTP/1.1";
-  char *hello = "POST /authorize?code=1234 HTTP/1.1\nHost: "
-                "example.com\nContent: Test\n\n{Test}";
+  const char *hello = "POST /api/users HTTP/1.1\r\n"
+                      "Host: example.com\r\n"
+                      "Content-Type: application/json\r\n"
+                      "Content-Length: 45\r\n"
+                      "User-Agent: Mozilla/5.0\r\n"
+                      "Accept: application/json\r\n"
+                      "\r\n"
+                      "{\"username\":\"john\",\"email\":\"john@example.com\"}";
+
   char buffer[1024] = {0};
   if ((client_fd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
     printf("\n Socket creation error \n");

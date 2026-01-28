@@ -82,6 +82,23 @@ struct Request *parse_request(char *buffer) {
     free(query_string);
   }
 
+  char *header;
+  while ((header = strsep(&buffer, "\r\n")) != NULL &&
+         request->header_count < 32) {
+    if (strstr(header, "HTTP/1.1") != NULL || strcmp(header, "") == 0) {
+      continue;
+    }
+    char *colon = strchr(header, ':');
+    if (colon == NULL) {
+      request->error = "Invalid Header";
+      return request;
+    }
+    *colon = '\0';
+    request->header_keys[request->header_count] = header;
+    request->header_values[request->header_count] = colon + 1;
+    request->header_count++;
+  }
+
   char *token;
   char *url_path_copy = strdup(request->resource_path);
   request->segment_count = 0;

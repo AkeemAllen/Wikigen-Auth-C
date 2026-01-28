@@ -10,6 +10,9 @@
 struct Request {
     char *method;
     char *resource_path;
+    char *header_keys[32];
+    char *header_values[32];
+    int header_count;
     char *segments[256];
     int segment_count;
     char *query_param_keys[32];
