@@ -1,6 +1,6 @@
 #include "cJSON.h"
-#include "parser.h"
 #include "request.h"
+#include "request_parser.h"
 #include <curl/curl.h>
 #include <errno.h>
 #include <netinet/in.h>
@@ -98,9 +98,8 @@ void *handle_client_request(void *arg) {
   printf("Resource Path: %s\n", request->resource_path);
   printf("Segments: %d\n", request->segment_count);
   printf("Param Count: %d\n", request->param_count);
-  if (request == NULL) {
-    char *error = "Invalid URL";
-    send(client_fd, error, strlen(error), 0);
+  if (request->error != NULL) {
+    send(client_fd, request->error, strlen(request->error), 0);
     free(request);
     return NULL;
   }

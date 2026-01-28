@@ -16,6 +16,7 @@ struct Request {
     char *query_param_values[32];
     int param_count;
     char *body;
+    char *error;
 };
 
 struct Request *parse_request(char *buffer);

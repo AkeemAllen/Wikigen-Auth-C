@@ -1,4 +1,4 @@
-#include "parser.h"
+#include "request_parser.h"
 #define WHITESPACE_SKIP 1
 
 char *get_method(char first_char, char second_char) {
@@ -11,6 +11,9 @@ char *get_method(char first_char, char second_char) {
   }
 
   if (first_char == 'P') {
+    if (second_char == 'A') {
+      return "PATCH";
+    }
     if (second_char == 'O') {
       return "POST";
     }
@@ -18,6 +21,8 @@ char *get_method(char first_char, char second_char) {
       return "PUT";
     }
   }
+
+  return "";
 }
 
 struct Request *parse_request(char *buffer) {
@@ -25,11 +30,15 @@ struct Request *parse_request(char *buffer) {
 
   // Able to determine method from first two characters
   request->method = get_method(buffer[0], buffer[1]);
+  if (strcmp(request->method, "") == 0) {
+    request->error = "Invalid HTTP Method";
+    return request;
+  }
   int method_size = strlen(request->method) + WHITESPACE_SKIP;
 
   request->resource_path = (char *)malloc(1024 * sizeof(char));
 
-  char *queryString;
+  char *query_string;
 
   int buffer_size = strlen(buffer);
   for (int i = method_size; i < (int)buffer_size; i++) {
@@ -39,28 +48,28 @@ struct Request *parse_request(char *buffer) {
     }
 
     if (buffer[i] == '?') {
-      queryString = (char *)malloc(strlen(buffer) * sizeof(char));
+      query_string = (char *)malloc(strlen(buffer) * sizeof(char));
       int skipped_path_length = strlen(request->resource_path);
 
       for (size_t i = skipped_path_length; i < strlen(buffer); i++) {
         if (buffer[i] == ' ') {
           request->resource_path[i - method_size] = '\0';
-          queryString[i - skipped_path_length] = '\0';
+          query_string[i - skipped_path_length] = '\0';
           break;
         }
 
-        queryString[i - skipped_path_length] = buffer[i];
+        query_string[i - skipped_path_length] = buffer[i];
       }
     }
 
     request->resource_path[i - method_size] = buffer[i];
   }
 
-  if (strlen(queryString) > 0) {
+  if (strlen(query_string) > 0) {
     char *param;
     request->param_count = 0;
 
-    while ((param = strsep(&queryString, "&")) != NULL &&
+    while ((param = strsep(&query_string, "&")) != NULL &&
            request->param_count < 32) {
       char *equals = strchr(param, '=');
       if (equals != NULL) {
@@ -70,7 +79,7 @@ struct Request *parse_request(char *buffer) {
         request->param_count++;
       }
     }
-    free(queryString);
+    free(query_string);
   }
 
   char *token;
