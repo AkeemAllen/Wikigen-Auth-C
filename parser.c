@@ -1,74 +1,88 @@
 #include "parser.h"
+#define WHITESPACE_SKIP 1
 
-struct URL *parse_url(char *buffer, int method_size) {
-  char *buffer_cpy = strdup(buffer);
-  char *buffer_split_token;
-  char split_buffer[1024][1024];
-  int split_count = 0;
-
-  struct URL *url = (struct URL *)malloc(sizeof(struct URL));
-  while ((buffer_split_token = strsep(&buffer_cpy, "\n")) != NULL) {
-    if (strlen(buffer_split_token) == 0)
-      continue;
-    strncpy(split_buffer[split_count], buffer_split_token,
-            strlen(buffer_split_token));
-    split_count++;
+char *get_method(char first_char, char second_char) {
+  if (first_char == 'G') {
+    return "GET";
   }
-  free(buffer_cpy);
 
-  char method_resource_httpv[1024];
-  strncpy(method_resource_httpv, split_buffer[0], strlen(split_buffer[0]));
-  method_resource_httpv[strlen(split_buffer[0])] = '\0';
+  if (first_char == 'D') {
+    return "DELETE";
+  }
 
-  url->path = (char *)malloc(strlen(method_resource_httpv) + 1);
+  if (first_char == 'P') {
+    if (second_char == 'O') {
+      return "POST";
+    }
+    if (second_char == 'U') {
+      return "PUT";
+    }
+  }
+}
 
-  size_t path_length = strlen(method_resource_httpv);
-  for (int i = method_size; i < (int)path_length; i++) {
-    if (method_resource_httpv[i] == '?') {
-      url->queryStrings = (char *)malloc(strlen(split_buffer[0]) + 1);
-      int skippedURLPathLength = strlen(url->path) + method_size;
-      for (size_t i = skippedURLPathLength; i < strlen(split_buffer[0]); i++) {
-        if (split_buffer[0][i] == ' ')
+struct Request *parse_request(char *buffer) {
+  struct Request *request = (struct Request *)malloc(sizeof(struct Request));
+
+  // Able to determine method from first two characters
+  request->method = get_method(buffer[0], buffer[1]);
+  int method_size = strlen(request->method) + WHITESPACE_SKIP;
+
+  request->resource_path = (char *)malloc(1024 * sizeof(char));
+
+  char *queryString;
+
+  int buffer_size = strlen(buffer);
+  for (int i = method_size; i < (int)buffer_size; i++) {
+    if (buffer[i] == ' ') {
+      request->resource_path[i - method_size] = '\0';
+      break;
+    }
+
+    if (buffer[i] == '?') {
+      queryString = (char *)malloc(strlen(buffer) * sizeof(char));
+      int skipped_path_length = strlen(request->resource_path);
+
+      for (size_t i = skipped_path_length; i < strlen(buffer); i++) {
+        if (buffer[i] == ' ') {
+          request->resource_path[i - method_size] = '\0';
+          queryString[i - skipped_path_length] = '\0';
           break;
-        url->queryStrings[i - skippedURLPathLength] = split_buffer[0][i];
+        }
+
+        queryString[i - skipped_path_length] = buffer[i];
       }
     }
-    if (method_resource_httpv[i] == ' ')
-      break;
 
-    url->path[i - method_size] = method_resource_httpv[i];
+    request->resource_path[i - method_size] = buffer[i];
   }
 
-  if (strlen(url->queryStrings) > 0) {
+  if (strlen(queryString) > 0) {
     char *param;
-    char *queryStringCopy = strdup(url->queryStrings + 1);
-    url->paramCount = 0;
+    request->param_count = 0;
 
-    while ((param = strsep(&queryStringCopy, "&")) != NULL &&
-           url->paramCount < 32) {
+    while ((param = strsep(&queryString, "&")) != NULL &&
+           request->param_count < 32) {
       char *equals = strchr(param, '=');
       if (equals != NULL) {
         *equals = '\0';
-        url->paramKeys[url->paramCount] = param;
-        url->paramValues[url->paramCount] = equals + 1;
-        url->paramCount++;
+        request->query_param_keys[request->param_count] = param;
+        request->query_param_values[request->param_count] = equals + 1;
+        request->param_count++;
       }
     }
-    free(queryStringCopy);
+    free(queryString);
   }
 
   char *token;
-  char *urlPathCopy = strdup(url->path);
-  url->segmentCount = 0;
-  while ((token = strsep(&urlPathCopy, "/")) != NULL) {
+  char *url_path_copy = strdup(request->resource_path);
+  request->segment_count = 0;
+  while ((token = strsep(&url_path_copy, "/")) != NULL) {
     if (strlen(token) == 0)
       continue;
-    url->segments[url->segmentCount] = token;
-    url->segmentCount++;
+    request->segments[request->segment_count] = token;
+    request->segment_count++;
   }
-  free(urlPathCopy);
+  free(url_path_copy);
 
-  url->body = split_buffer[split_count - 1];
-
-  return url;
+  return request;
 }

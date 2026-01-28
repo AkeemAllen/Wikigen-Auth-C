@@ -7,17 +7,16 @@
 #include <sys/socket.h>
 #define BUFFER_SIZE 104857600
 
-// TODO: Rename to Request and Request Parsing
-struct URL {
-    char *path;
+struct Request {
+    char *method;
+    char *resource_path;
     char *segments[256];
-    char *paramKeys[32];
-    char *paramValues[32];
-    char *queryStrings;
-    int segmentCount;
-    int paramCount;
+    int segment_count;
+    char *query_param_keys[32];
+    char *query_param_values[32];
+    int param_count;
     char *body;
 };
 
-struct URL *parse_url(char *buffer, int method_size);
+struct Request *parse_request(char *buffer);
 #endif
