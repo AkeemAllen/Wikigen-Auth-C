@@ -83,11 +83,23 @@ struct Request *parse_request(char *buffer) {
   }
 
   char *header;
+  int empty_header_count = 0;
   while ((header = strsep(&buffer, "\r\n")) != NULL &&
          request->header_count < 32) {
-    if (strstr(header, "HTTP/1.1") != NULL || strcmp(header, "") == 0) {
+    if (strstr(header, "HTTP/1.1") != NULL) {
       continue;
     }
+
+    if (strcmp(header, "") == 0) {
+      empty_header_count++;
+      // If we have more than one empty header, we've reached the body
+      if (empty_header_count > 1) {
+        break;
+      }
+      continue;
+    }
+    empty_header_count = 0;
+
     char *colon = strchr(header, ':');
     if (colon == NULL) {
       request->error = "Invalid Header";
@@ -97,6 +109,13 @@ struct Request *parse_request(char *buffer) {
     request->header_keys[request->header_count] = header;
     request->header_values[request->header_count] = colon + 1;
     request->header_count++;
+  }
+
+  if (buffer != NULL) {
+    if (buffer[0] == '\n') {
+      buffer++;
+    }
+    request->body = buffer;
   }
 
   char *token;
