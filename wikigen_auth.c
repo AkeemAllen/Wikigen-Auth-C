@@ -1,6 +1,7 @@
 #include "cJSON.h"
 #include "request.h"
 #include "request_parser.h"
+#include "router.h"
 #include <curl/curl.h>
 #include <errno.h>
 #include <netinet/in.h>
@@ -14,11 +15,14 @@
 #define PORT 8080
 #define BUFFER_SIZE 104857600
 #define METHOD_SIZE_GET 4
+static struct RouteNode *g_router;
 
 void *handle_client_request(void *arg);
-// void handle_get_requests(int client_fd, struct URL *url);
-void handle_post_requests(int client_fd, char *buffer);
+void route_request(int client_fd, struct Request *request);
 void authorize(int client_fd, char *code);
+void handle_authorize(int client_fd, struct Request *request);
+
+void handle_root(int client_fd, struct Request *request) {}
 
 int main(int argc, char *argv[]) {
   int server_fd;
@@ -59,6 +63,9 @@ int main(int argc, char *argv[]) {
     exit(EXIT_FAILURE);
   }
 
+  g_router = create_route_node("", handle_root);
+  add_child_route(g_router, create_route_node("authorize", handle_authorize));
+
   while (1) {
     struct sockaddr_in client_addr;
     socklen_t client_addr_len = sizeof(client_addr);
@@ -97,15 +104,22 @@ void *handle_client_request(void *arg) {
   if (request->error != NULL) {
     send(client_fd, request->error, strlen(request->error), 0);
     free(request);
+    free(buffer);
     return NULL;
   }
 
-  // handle_get_requests(client_fd, url);
+  route_request(client_fd, request);
   send(client_fd, "OK", strlen("OK"), 0);
   free(request);
-  return NULL;
+  free(buffer);
 
   return NULL;
+}
+
+void route_request(int client_fd, struct Request *request) {}
+
+void handle_authorize(int client_fd, struct Request *request) {
+  printf("Authorized\n");
 }
 
 // void handle_get_requests(int client_fd, struct URL *url) {
