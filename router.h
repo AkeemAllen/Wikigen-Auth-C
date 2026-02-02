@@ -17,5 +17,6 @@ struct RouteNode {
 struct RouteNode *create_route_node(const char *segment, void (*handler)(int, struct Request*));
 int add_child_route(struct RouteNode *parent, struct RouteNode *child);
 void print_router(struct RouteNode *node, int level);
+struct RouteNode *find_route(struct RouteNode *node, char *segment);
 
 #endif

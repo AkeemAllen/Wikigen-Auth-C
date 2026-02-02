@@ -45,3 +45,22 @@ void print_router(struct RouteNode *node, int level) {
   for (int i = 0; i < (int)node->child_count; i++)
     print_router(node->children[i], level + 1);
 }
+
+struct RouteNode *find_route(struct RouteNode *node, char *segment) {
+  if (node->segment == NULL) {
+    return NULL;
+  }
+
+  if (strcmp(node->segment, segment) == 0) {
+    return node;
+  }
+
+  for (int i = 0; i < (int)node->child_count; i++) {
+    struct RouteNode *child = find_route(node->children[i], segment);
+    if (child != NULL) {
+      return child;
+    }
+  }
+
+  return NULL;
+}

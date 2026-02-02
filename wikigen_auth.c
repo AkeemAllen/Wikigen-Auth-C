@@ -18,7 +18,7 @@
 static struct RouteNode *g_router;
 
 void *handle_client_request(void *arg);
-void route_request(int client_fd, struct Request *request);
+int route_request(int client_fd, struct Request *request);
 void authorize(int client_fd, char *code);
 void handle_authorize(int client_fd, struct Request *request);
 
@@ -64,7 +64,10 @@ int main(int argc, char *argv[]) {
   }
 
   g_router = create_route_node("", handle_root);
-  add_child_route(g_router, create_route_node("authorize", handle_authorize));
+  struct RouteNode *api = create_route_node("api", handle_root);
+
+  add_child_route(g_router, api);
+  add_child_route(api, create_route_node("users", handle_authorize));
 
   while (1) {
     struct sockaddr_in client_addr;
@@ -108,7 +111,14 @@ void *handle_client_request(void *arg) {
     return NULL;
   }
 
-  route_request(client_fd, request);
+  int routed = route_request(client_fd, request);
+  if (routed < 0) {
+    send(client_fd, "No route found", strlen("No route found"), 0);
+    free(request);
+    free(buffer);
+    return NULL;
+  }
+
   send(client_fd, "OK", strlen("OK"), 0);
   free(request);
   free(buffer);
@@ -116,7 +126,24 @@ void *handle_client_request(void *arg) {
   return NULL;
 }
 
-void route_request(int client_fd, struct Request *request) {}
+int route_request(int client_fd, struct Request *request) {
+  struct RouteNode *current_node = g_router;
+  for (int i = 0; i < request->segment_count; i++) {
+    printf("Segment: %s\n", request->segments[i]);
+    current_node = find_route(current_node, request->segments[i]);
+
+    if (current_node == NULL) {
+      printf("No route found for %s\n", request->segments[i]);
+      return -1;
+    }
+
+    if (i == request->segment_count - 1) {
+      printf("Calling handler\n");
+      current_node->handler(client_fd, request);
+      return 0;
+    }
+  }
+}
 
 void handle_authorize(int client_fd, struct Request *request) {
   printf("Authorized\n");
