@@ -9,7 +9,7 @@ int main(int argc, char const *argv[]) {
   int status, valread, client_fd;
   struct sockaddr_in serv_addr;
   // char* hello = "GET /authorize?code=1234 HTTP/1.1";
-  const char *hello = "POST /api/users HTTP/1.1\r\n"
+  const char *hello = "POST /create_jwt HTTP/1.1\r\n"
                       "Host: example.com\r\n"
                       "Content-Type: application/json\r\n"
                       "Content-Length: 45\r\n"

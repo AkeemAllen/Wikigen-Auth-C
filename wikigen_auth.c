@@ -2,6 +2,7 @@
 #include "request.h"
 #include "request_parser.h"
 #include "router.h"
+#include "token_util.h"
 #include <curl/curl.h>
 #include <errno.h>
 #include <netinet/in.h>
@@ -21,6 +22,8 @@ void *handle_client_request(void *arg);
 int route_request(int client_fd, struct Request *request);
 void authorize(int client_fd, char *code);
 void handle_authorize(int client_fd, struct Request *request);
+void handle_create_repo(int client_fd, struct Request *request);
+void handle_create_jwt(int client_fd, struct Request *request);
 
 void handle_root(int client_fd, struct Request *request) {}
 
@@ -64,10 +67,13 @@ int main(int argc, char *argv[]) {
   }
 
   g_router = create_route_node("", handle_root);
-  struct RouteNode *api = create_route_node("api", handle_root);
+  struct RouteNode *create_repo =
+      create_route_node("create_repo", handle_create_repo);
+  struct RouteNode *create_jwt =
+      create_route_node("create_jwt", handle_create_jwt);
 
-  add_child_route(g_router, api);
-  add_child_route(api, create_route_node("users", handle_authorize));
+  add_child_route(g_router, create_repo);
+  add_child_route(g_router, create_jwt);
 
   while (1) {
     struct sockaddr_in client_addr;
@@ -138,7 +144,6 @@ int route_request(int client_fd, struct Request *request) {
     }
 
     if (i == request->segment_count - 1) {
-      printf("Calling handler\n");
       current_node->handler(client_fd, request);
       return 0;
     }
@@ -147,6 +152,24 @@ int route_request(int client_fd, struct Request *request) {
 
 void handle_authorize(int client_fd, struct Request *request) {
   printf("Authorized\n");
+}
+
+void handle_create_repo(int client_fd, struct Request *request) {
+  cJSON *json = cJSON_Parse(request->body);
+  if (json == NULL) {
+    send(client_fd, "Failed to parse JSON", strlen("Failed to parse JSON"), 0);
+    return;
+  }
+  cJSON *token = cJSON_GetObjectItem(json, "token");
+  cJSON *wiki_name = cJSON_GetObjectItem(json, "wikiName");
+}
+
+void handle_create_jwt(int client_fd, struct Request *request) {
+  struct Payload *payload = malloc(sizeof(struct Payload));
+  payload->user_name = "John Doe";
+  payload->avatar = "https://avatars.githubusercontent.com/u/123456?v=4";
+  char *token = create_jwt(payload);
+  send(client_fd, token, strlen(token), 0);
 }
 
 // void handle_get_requests(int client_fd, struct URL *url) {
