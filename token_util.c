@@ -63,18 +63,27 @@ char *create_jwt(struct Payload *payload) {
 
 struct Payload *verify_jwt(char *token) {
   jwt_t *jwt = NULL;
-  char *jwt_secret = get_env_value("JWT_SECRET");
+  jwt_checker_t *checker = jwt_checker_new();
 
-  //int ret = jwt_decode(&jwt, token, (unsigned char *)jwt_secret, strlen(jwt_secret));
+  if (checker == NULL) {
+    printf("Failed to create JWT checker\n");
+    return NULL;
+  }
 
-  //if (ret != 0) {
-  //    printf("JWT verification failed!\n");
-  //    return NULL;
-  //}
-    
+  // char *jwt_secret = get_env_value("JWT_SECRET");
+  int is_valid = jwt_checker_verify(checker, token);
+
+  if (is_valid != 0) {
+    printf("JWT verification failed!\n");
+    return NULL;
+  }
+
   struct Payload *payload = malloc(sizeof(struct Payload));
-  //payload->user_name = jwt_get_grant(jwt, "user_name");
-  //payload->avatar = jwt_get_grant(jwt, "avatar");
+
+  payload->user_name = jwt_checker_claim_get(checker, JWT_CLAIM_EXP);
+  payload->avatar = "";
+  printf("User Name: %s\n", payload->user_name);
+  jwt_checker_free(checker);
 
   return payload;
 }

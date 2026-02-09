@@ -170,6 +170,8 @@ void handle_create_jwt(int client_fd, struct Request *request) {
   payload->avatar = "https://avatars.githubusercontent.com/u/123456?v=4";
   char *token = create_jwt(payload);
   send(client_fd, token, strlen(token), 0);
+
+  struct Payload *verified_payload = verify_jwt(token);
 }
 
 // void handle_get_requests(int client_fd, struct URL *url) {
