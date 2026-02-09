@@ -1,25 +1,23 @@
 CC = gcc
 CFLAGS = -Wall -Wextra
+BUILDDIR = build
 
-all: wikigen_auth
+SOURCES := $(wildcard *.c)
+OBJECTS := $(patsubst %.c,$(BUILDDIR)/%.o,$(SOURCES))
+EXECUTABLE := $(BUILDDIR)/wikigen_auth
 
-wikigen_auth: token_util.o router.o cJSON.o request_parser.o request.o wikigen_auth.c
-	$(CC) token_util.o router.o cJSON.o request_parser.o request.o wikigen_auth.c -o wikigen_auth -lcurl -ljwt -g -gdwarf-4
+all: $(BUILDDIR) $(EXECUTABLE)
 
-cJSON.o: cJSON.c cJSON.h
-	$(CC) $(CFLAGS) -c cJSON.c -o cJSON.o
+$(EXECUTABLE): $(OBJECTS)
+	$(CC) $(OBJECTS) -o $@ -lcurl -ljwt -g -gdwarf-4
 
-parser.o: request_parser.c request_parser.h
-	$(CC) $(CFLAGS) -c request_parser.c -o request_parser.o
 
-request.o: request.c request.h
-	$(CC) $(CFLAGS) -c request.c -o request.o
+$(BUILDDIR)/%.o: %.c
+	$(CC) $(CFLAGS) -c $< -o $@
 
-router.o: router.c router.h
-	$(CC) $(CFLAGS) -c router.c -o router.o
-
-token_util.o: token_util.c token_util.h
-	$(CC) $(CFLAGS) -c token_util.c -o token_util.o
+# Rule to create the build directory
+$(BUILDDIR):
+	mkdir -p $(BUILDDIR)
 
 clean:
-	rm -f *.o wikigen_auth
+	rm -f $(BUILDDIR)/*.o
