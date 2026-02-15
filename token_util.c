@@ -74,12 +74,21 @@ char *create_jwt(struct Payload *payload) {
   jwt_set_SET_STR(&user_name, "user_name", payload->user_name);
   jwt_value_t avatar;
   jwt_set_SET_STR(&avatar, "avatar", payload->avatar);
+  jwt_value_t iat;
+  jwt_set_SET_INT(&iat, "iat", time(NULL));
+  jwt_value_t iss;
+  jwt_set_SET_STR(&iss, "iss", "Wikigen-Auth");
+  jwt_value_t aud;
+  jwt_set_SET_STR(&aud, "aud", "Wikigen-Client");
   jwt_value_t exp;
   jwt_set_SET_INT(&exp, "exp", time(NULL) + 28800);
   
   jwt_builder_claim_set(builder, &user_name);
   jwt_builder_claim_set(builder, &avatar);
   jwt_builder_claim_set(builder, &exp);
+  jwt_builder_claim_set(builder, &iat);
+  jwt_builder_claim_set(builder, &iss);
+  jwt_builder_claim_set(builder, &aud);
 
   char *jwt_secret = get_jwks();
 
@@ -129,7 +138,7 @@ struct Payload *verify_jwt(char *token) {
   jwk_set_t *keys = jwks_create_strn(jwt_secret, strlen(jwt_secret));
   jwk_item_t *key = jwks_item_get(keys, 0);
 
-  jwt_checker_setkey(checker, JWT_ALG_HS256, NULL);
+  jwt_checker_setkey(checker, JWT_ALG_HS256, key);
   jwt_checker_setcb(checker, verify_callback, payload);
 
   int is_valid = jwt_checker_verify(checker, token);
