@@ -1,6 +1,6 @@
 #include "router.h"
 
-struct RouteNode *create_route_node(const char *segment,
+struct RouteNode *create_route_node(char *segment,
                                     void (*handler)(int, struct Request *)) {
   struct RouteNode *node = malloc(sizeof(struct RouteNode));
   node->segment = segment;

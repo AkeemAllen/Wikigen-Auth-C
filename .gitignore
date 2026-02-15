@@ -4,3 +4,4 @@
 wikigen_auth
 client
 .env
+JWKS.json

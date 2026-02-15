@@ -1,6 +1,8 @@
 CC = gcc
-CFLAGS = -Wall -Wextra
+CFLAGS = -Wall -Wextra 
 BUILDDIR = build
+LIBFLAGS = -lcurl -ljwt
+DEBUGFLAGS = -g -gdwarf-4
 
 SOURCES := $(wildcard *.c)
 OBJECTS := $(patsubst %.c,$(BUILDDIR)/%.o,$(SOURCES))
@@ -9,8 +11,7 @@ EXECUTABLE := $(BUILDDIR)/wikigen_auth
 all: $(BUILDDIR) $(EXECUTABLE)
 
 $(EXECUTABLE): $(OBJECTS)
-	$(CC) $(OBJECTS) -o $@ -lcurl -ljwt -g -gdwarf-4
-
+	$(CC) $(OBJECTS) -o $@ $(LIBFLAGS) $(DEBUGFLAGS)
 
 $(BUILDDIR)/%.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@
@@ -20,4 +21,4 @@ $(BUILDDIR):
 	mkdir -p $(BUILDDIR)
 
 clean:
-	rm -f $(BUILDDIR)/*.o
+	rm -rf $(BUILDDIR)

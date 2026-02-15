@@ -172,6 +172,7 @@ void handle_create_jwt(int client_fd, struct Request *request) {
   send(client_fd, token, strlen(token), 0);
 
   struct Payload *verified_payload = verify_jwt(token);
+  printf("Verified: %s\n", verified_payload->user_name);
 }
 
 // void handle_get_requests(int client_fd, struct URL *url) {
