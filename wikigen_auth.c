@@ -1,7 +1,6 @@
 #include "request_parser.h"
 #include "router.h"
 #include "db.h"
-#include <curl/curl.h>
 #include <errno.h>
 #include <netinet/in.h>
 #include <pthread.h>
