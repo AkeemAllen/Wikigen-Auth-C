@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <jwt.h>
+#include "env.h"
 
 struct Payload {
   char *user_name;

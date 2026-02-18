@@ -1,7 +1,7 @@
 #include "router.h"
 
 struct RouteNode *create_route_node(char *segment,
-                                    void (*handler)(int, struct Request *)) {
+                                    void (*handler)(int, struct Request *, libsql_connection_t)) {
   struct RouteNode *node = malloc(sizeof(struct RouteNode));
   node->segment = segment;
   node->children = NULL;
@@ -40,8 +40,8 @@ void print_router(struct RouteNode *node, int level) {
     printf("|  ");
 
   printf("- %s\n", node->segment);
-  if (node->handler)
-    node->handler(0, NULL);
+  //if (node->handler)
+    //node->handler(0, NULL, NULL);
   for (int i = 0; i < (int)node->child_count; i++)
     print_router(node->children[i], level + 1);
 }

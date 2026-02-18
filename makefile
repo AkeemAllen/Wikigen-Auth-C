@@ -1,7 +1,7 @@
 CC = gcc
 CFLAGS = -Wall -Wextra 
 BUILDDIR = build
-LIBFLAGS = -lcurl -ljwt
+LIBFLAGS = -lcurl -ljwt -L/home/akeem/Projects/Wikigen-Auth-C/lib -llibsql
 DEBUGFLAGS = -g -gdwarf-4
 
 SOURCES := $(wildcard *.c)
