@@ -1,7 +1,10 @@
 #include "router.h"
+#include "route_handlers.h"
+
+static struct RouteNode *g_router;
 
 struct RouteNode *create_route_node(char *segment,
-                                    void (*handler)(int, struct Request *, libsql_connection_t)) {
+                                    void (*handler)(int, struct Request *)) {
   struct RouteNode *node = malloc(sizeof(struct RouteNode));
   node->segment = segment;
   node->children = NULL;
@@ -64,3 +67,32 @@ struct RouteNode *find_route(struct RouteNode *node, char *segment) {
 
   return NULL;
 }
+
+int route_request(int client_fd, struct Request *request) {
+  struct RouteNode *current_node = g_router;
+  for (int i = 0; i < request->segment_count; i++) {
+    printf("Segment: %s\n", request->segments[i]);
+    current_node = find_route(current_node, request->segments[i]);
+
+    if (current_node == NULL) {
+      printf("No route found for %s\n", request->segments[i]);
+      return -1;
+    }
+
+    if (i == request->segment_count - 1) {
+      current_node->handler(client_fd, request);
+      return 0;
+    }
+  }
+  send(client_fd, "No route found", strlen("No route found"), 0);
+  return -1;
+}
+
+void init_routes() {
+  g_router = create_route_node("", handle_root);
+  struct RouteNode *create_repo =
+      create_route_node("create_repo", handle_create_repo);
+
+  add_child_route(g_router, create_repo);
+}
+
