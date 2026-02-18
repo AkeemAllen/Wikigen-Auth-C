@@ -60,7 +60,7 @@ char *create_jwt(struct Payload *payload) {
   char *jwt_secret = get_jwks();
 
   jwk_set_t *keys = jwks_create_strn(jwt_secret, strlen(jwt_secret));
-  jwk_item_t *key = jwks_item_get(keys, 0);
+  const jwk_item_t *key = jwks_item_get(keys, 0);
 
   jwt_builder_setkey(builder, JWT_ALG_HS256, key);
 
@@ -103,7 +103,7 @@ struct Payload *verify_jwt(char *token) {
   char *jwt_secret = get_jwks();
 
   jwk_set_t *keys = jwks_create_strn(jwt_secret, strlen(jwt_secret));
-  jwk_item_t *key = jwks_item_get(keys, 0);
+  const jwk_item_t *key = jwks_item_get(keys, 0);
 
   jwt_checker_setkey(checker, JWT_ALG_HS256, key);
   jwt_checker_setcb(checker, verify_callback, payload);

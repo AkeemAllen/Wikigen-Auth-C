@@ -8,7 +8,7 @@
 #include "libsql.h"
 #include "cJSON.h"
 #include "db.h"
-#include "request.h"
+#include "curl_request.h"
 
 void handle_root(int client_fd, struct Request *request);
 void handle_create_repo(int client_fd, struct Request *request);

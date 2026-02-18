@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -Wall -Wextra 
+CFLAGS = -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable
 BUILDDIR = build
 LIBFLAGS = -lcurl -ljwt -L/home/akeem/Projects/Wikigen-Auth-C/lib -llibsql
 DEBUGFLAGS = -g -gdwarf-4

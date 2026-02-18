@@ -1,4 +1,4 @@
-#include "request.h"
+#include "curl_request.h"
 
 char *perform_curl_request(const char *url, const char *method) {
   if (strcmp("POST", method) != 0) {
