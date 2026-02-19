@@ -43,8 +43,8 @@ void print_router(struct RouteNode *node, int level) {
     printf("|  ");
 
   printf("- %s\n", node->segment);
-  //if (node->handler)
-    //node->handler(0, NULL, NULL);
+  // if (node->handler)
+  // node->handler(0, NULL, NULL);
   for (int i = 0; i < (int)node->child_count; i++)
     print_router(node->children[i], level + 1);
 }
@@ -95,4 +95,3 @@ void init_routes() {
 
   add_child_route(g_router, create_repo);
 }
-

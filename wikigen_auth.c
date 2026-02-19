@@ -1,6 +1,6 @@
+#include "db.h"
 #include "request_parser.h"
 #include "router.h"
-#include "db.h"
 #include <errno.h>
 #include <netinet/in.h>
 #include <pthread.h>
@@ -118,4 +118,3 @@ void *handle_client_request(void *arg) {
 
   return NULL;
 }
- 

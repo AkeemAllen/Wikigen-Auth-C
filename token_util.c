@@ -28,7 +28,6 @@ char *get_jwks() {
   return jwks;
 }
 
-
 char *create_jwt(struct Payload *payload) {
   jwt_builder_t *builder = jwt_builder_new();
 
@@ -49,7 +48,7 @@ char *create_jwt(struct Payload *payload) {
   jwt_set_SET_STR(&aud, "aud", "Wikigen-Client");
   jwt_value_t exp;
   jwt_set_SET_INT(&exp, "exp", time(NULL) + 28800);
-  
+
   jwt_builder_claim_set(builder, &user_name);
   jwt_builder_claim_set(builder, &avatar);
   jwt_builder_claim_set(builder, &exp);
@@ -71,20 +70,20 @@ char *create_jwt(struct Payload *payload) {
 }
 
 static int verify_callback(jwt_t *jwt, jwt_config_t *config) {
-      struct Payload *payload = (struct Payload *)config->ctx;
-      jwt_value_t jval;
+  struct Payload *payload = (struct Payload *)config->ctx;
+  jwt_value_t jval;
 
-      jwt_set_GET_STR(&jval, "user_name");
-      if (jwt_claim_get(jwt, &jval) == JWT_VALUE_ERR_NONE && jval.str_val != NULL) {
-          payload->user_name = strdup(jval.str_val);
-      }
+  jwt_set_GET_STR(&jval, "user_name");
+  if (jwt_claim_get(jwt, &jval) == JWT_VALUE_ERR_NONE && jval.str_val != NULL) {
+    payload->user_name = strdup(jval.str_val);
+  }
 
-      jwt_set_GET_STR(&jval, "avatar");
-      if (jwt_claim_get(jwt, &jval) == JWT_VALUE_ERR_NONE && jval.str_val != NULL) {
-          payload->avatar = strdup(jval.str_val);
-      }
+  jwt_set_GET_STR(&jval, "avatar");
+  if (jwt_claim_get(jwt, &jval) == JWT_VALUE_ERR_NONE && jval.str_val != NULL) {
+    payload->avatar = strdup(jval.str_val);
+  }
 
-      return 0;
+  return 0;
 }
 
 struct Payload *verify_jwt(char *token) {
