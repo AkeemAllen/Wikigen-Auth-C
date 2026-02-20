@@ -60,6 +60,7 @@ struct Request *parse_request(char *buffer) {
 
         query_string[i - skipped_path_length] = buffer[i];
       }
+      break;
     }
 
     request->resource_path[i - method_size] = buffer[i];
