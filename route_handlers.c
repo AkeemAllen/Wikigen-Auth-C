@@ -3,19 +3,19 @@
 void handle_root(int client_fd, struct Request *request) {}
 
 void handle_create_repo(int client_fd, struct Request *request) {
-  // cJSON *json = cJSON_Parse(request->body);
-  // if (json == NULL) {
-  //   send(client_fd, "Failed to parse JSON", strlen("Failed to parse JSON"),
-  //   0); return;
-  // }
-  // cJSON *token = cJSON_GetObjectItem(json, "token");
-  // cJSON *wiki_name = cJSON_GetObjectItem(json, "wikiName");
+  cJSON *json = cJSON_Parse(request->body);
+  if (json == NULL) {
+    send(client_fd, "Failed to parse JSON", strlen("Failed to parse JSON"), 0);
+    return;
+  }
+  cJSON *token = cJSON_GetObjectItem(json, "token");
+  cJSON *wiki_name = cJSON_GetObjectItem(json, "wikiName");
 
-  // struct Payload *payload = verify_jwt(token->valuestring);
-  // if (payload == NULL) {
-  //   send(client_fd, "Failed to verify JWT", strlen("Failed to verify JWT"),
-  //   0); return;
-  // }
+  struct Payload *payload = verify_jwt(token->valuestring);
+  if (payload == NULL) {
+    send(client_fd, "Failed to verify JWT", strlen("Failed to verify JWT"), 0);
+    return;
+  }
 
   printf("Creating connection\n");
   libsql_connection_t conn = get_db_connection();
@@ -62,15 +62,23 @@ typedef struct {
 } AccessToken;
 
 void handle_authorize(int client_fd, struct Request *request) {
-  char *code = "Random Code";
+  printf("Reached Authorize\n");
+  char *code = NULL;
+  for (int i = 0; i < request->param_count; i++) {
+    if (strcmp(request->query_param_keys[i], "code") == 0) {
+      printf("Code: %s\n", request->query_param_values[i]);
+      code = strdup(request->query_param_values[i]);
+    }
+  }
+
   if (code == NULL || strlen(code) == 0) {
     char *error = "Code Parameter is undefined";
     send(client_fd, error, strlen(error), 0);
     return;
   }
 
-  char *clientSecret = "Random Secret";
-  char *clientID = "Random ID";
+  char *clientSecret = get_env_value("CLIENT_SECRET");
+  char *clientID = get_env_value("CLIENT_ID");
 
   // Move Curl implementation into a separate function
   // For now, it should take, URL, method and return the response
@@ -80,7 +88,8 @@ void handle_authorize(int client_fd, struct Request *request) {
            "client_id=%s&client_secret=%s&code=%s",
            clientID, clientSecret, code);
 
-  char *response = perform_curl_request(githubOauthUrl, "POST");
+  char *headers[20] = {"Accept: application/json"};
+  char *response = perform_curl_request(githubOauthUrl, "POST", headers);
   if (!response) {
     send(client_fd, "Failed to perform request",
          strlen("Failed to perform request"), 0);
@@ -97,6 +106,9 @@ void handle_authorize(int client_fd, struct Request *request) {
   cJSON *error_item = cJSON_GetObjectItem(json, "error");
   if (error_item != NULL) {
     printf("Error: %s\n", error_item->valuestring);
+    send(client_fd, "Error", strlen("Error"), 0);
+    free(response);
+    return;
   }
 
   // Parse into AccessToken struct
@@ -112,17 +124,55 @@ void handle_authorize(int client_fd, struct Request *request) {
   if (scope)
     token.scope = scope->valuestring;
 
-  // Step 3: Print the response
-  printf("Access Token: %s\n", token.access_token ? token.access_token : "N/A");
-  printf("Token Type: %s\n", token.token_type ? token.token_type : "N/A");
-  printf("Scope: %s\n", token.scope ? token.scope : "N/A");
+  char githubUserUrl[512];
+  printf("Setting URL");
+  snprintf(githubUserUrl, sizeof(githubUserUrl), "https://api.github.com/user");
 
-  // Step 3 (alternative): Print raw JSON
-  printf("\nRaw JSON Response:\n%s\n", response);
+  printf("Token: %s\n", token.access_token);
+
+  char github_user_headers[20][100];
+  strcpy(github_user_headers[0], "Accept: application/json");
+  strcpy(github_user_headers[1], "Authorization: Bearer ");
+  strcat(github_user_headers[1], token.access_token);
+  strcpy(github_user_headers[2], "User-Agent: Mozilla/5.0 (X11; Linux x86_64; "
+                                 "rv:144.0) Gecko/20100101 Firefox/144.0");
+
+  char *githubUserResponse =
+      perform_curl_request(githubUserUrl, "GET", headers);
+  if (!githubUserResponse) {
+    send(client_fd, "Failed to perform request",
+         strlen("Failed to perform request"), 0);
+    free(githubUserResponse);
+    return;
+  }
+
+  printf("Response: %s\n", githubUserResponse);
+
+  cJSON *user_json = cJSON_Parse(githubUserResponse);
+  if (user_json == NULL) {
+    send(client_fd, "Failed to parse JSON", strlen("Failed to parse JSON"), 0);
+    free(githubUserResponse);
+    return;
+  }
+
+  cJSON *user_error_item = cJSON_GetObjectItem(user_json, "error");
+  if (user_error_item != NULL) {
+    printf("Error: %s\n", user_error_item->valuestring);
+    send(client_fd, "Error", strlen("Error"), 0);
+    free(githubUserResponse);
+    return;
+  }
+
+  cJSON *user_id = cJSON_GetObjectItem(user_json, "id");
+
+  printf("User ID: %lld\n", (long long)user_id->valueint);
 
   // Cleanup
   cJSON_Delete(json);
   free(response);
+
+  cJSON_Delete(user_json);
+  free(githubUserResponse);
 
   send(client_fd, "Authorized", strlen("Authorized"), 0);
 }

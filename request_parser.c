@@ -39,7 +39,7 @@ struct Request *parse_request(char *buffer) {
   request->resource_path = (char *)malloc(1024 * sizeof(char));
 
   char *query_string;
-
+  // TODO: This is horribly written, fix it
   int buffer_size = strlen(buffer);
   for (int i = method_size; i < (int)buffer_size; i++) {
     if (buffer[i] == ' ') {
@@ -49,7 +49,8 @@ struct Request *parse_request(char *buffer) {
 
     if (buffer[i] == '?') {
       query_string = (char *)malloc(strlen(buffer) * sizeof(char));
-      int skipped_path_length = strlen(request->resource_path);
+      int skipped_path_length =
+          strlen(request->resource_path) + method_size + 1;
 
       for (size_t i = skipped_path_length; i < strlen(buffer); i++) {
         if (buffer[i] == ' ') {

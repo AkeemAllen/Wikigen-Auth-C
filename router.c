@@ -92,6 +92,9 @@ void init_routes() {
   g_router = create_route_node("", handle_root);
   struct RouteNode *create_repo =
       create_route_node("create_repo", handle_create_repo);
+  struct RouteNode *authorize =
+      create_route_node("authorize", handle_authorize);
 
   add_child_route(g_router, create_repo);
+  add_child_route(g_router, authorize);
 }

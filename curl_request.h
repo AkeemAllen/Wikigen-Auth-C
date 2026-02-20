@@ -10,7 +10,7 @@ typedef struct {
   size_t size;
 } Response;
 
-char *perform_curl_request(const char *url, const char *method);
+char *perform_curl_request(const char *url, const char *method, char *received_headers[20]);
 size_t write_callback(void *contents, size_t size, size_t nmemb, void *userp);
 
 #endif

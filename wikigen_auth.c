@@ -59,6 +59,7 @@ int main(int argc, char *argv[]) {
     perror("listen");
     exit(EXIT_FAILURE);
   }
+  printf("Server is listening on port %d\n", PORT);
 
   init_routes();
 
@@ -112,7 +113,6 @@ void *handle_client_request(void *arg) {
     return NULL;
   }
 
-  send(client_fd, "OK", strlen("OK"), 0);
   free(request);
   free(buffer);
 

@@ -1,10 +1,7 @@
 #include "curl_request.h"
 
-char *perform_curl_request(const char *url, const char *method) {
-  if (strcmp("POST", method) != 0) {
-    return NULL;
-  }
-
+char *perform_curl_request(const char *url, const char *method,
+                           char *received_headers[20]) {
   Response response = {.data = malloc(1), .size = 0};
   if (response.data == NULL) {
     return NULL;
@@ -18,12 +15,20 @@ char *perform_curl_request(const char *url, const char *method) {
   }
 
   curl_easy_setopt(curl, CURLOPT_URL, url);
-  curl_easy_setopt(curl, CURLOPT_POST, 1L);
-  curl_easy_setopt(curl, CURLOPT_POSTFIELDS, "");
+  if (strcmp(method, "POST") == 0) {
+    curl_easy_setopt(curl, CURLOPT_POST, 1L);
+    curl_easy_setopt(curl, CURLOPT_POSTFIELDS, "");
+  }
   curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_callback);
   curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
 
   struct curl_slist *headers = NULL;
+  for (int i = 0; i < 20; i++) {
+    if (received_headers[i] == NULL) {
+      break;
+    }
+    headers = curl_slist_append(headers, received_headers[i]);
+  }
   headers = curl_slist_append(headers, "Accept: application/json");
   curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
 
