@@ -1,7 +1,7 @@
 #include "curl_request.h"
 
 char *perform_curl_request(const char *url, const char *method,
-                           char *received_headers[20]) {
+                           char received_headers[20][100]) {
   Response response = {.data = malloc(1), .size = 0};
   if (response.data == NULL) {
     return NULL;

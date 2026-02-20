@@ -71,7 +71,6 @@ struct RouteNode *find_route(struct RouteNode *node, char *segment) {
 int route_request(int client_fd, struct Request *request) {
   struct RouteNode *current_node = g_router;
   for (int i = 0; i < request->segment_count; i++) {
-    printf("Segment: %s\n", request->segments[i]);
     current_node = find_route(current_node, request->segments[i]);
 
     if (current_node == NULL) {

@@ -62,7 +62,6 @@ typedef struct {
 } AccessToken;
 
 void handle_authorize(int client_fd, struct Request *request) {
-  printf("Reached Authorize\n");
   char *code = NULL;
   for (int i = 0; i < request->param_count; i++) {
     if (strcmp(request->query_param_keys[i], "code") == 0) {
@@ -88,7 +87,9 @@ void handle_authorize(int client_fd, struct Request *request) {
            "client_id=%s&client_secret=%s&code=%s",
            clientID, clientSecret, code);
 
-  char *headers[20] = {"Accept: application/json"};
+  char headers[20][100];
+  strcpy(headers[0], "Accept: application/json");
+
   char *response = perform_curl_request(githubOauthUrl, "POST", headers);
   if (!response) {
     send(client_fd, "Failed to perform request",
@@ -125,20 +126,16 @@ void handle_authorize(int client_fd, struct Request *request) {
     token.scope = scope->valuestring;
 
   char githubUserUrl[512];
-  printf("Setting URL");
   snprintf(githubUserUrl, sizeof(githubUserUrl), "https://api.github.com/user");
 
-  printf("Token: %s\n", token.access_token);
-
   char github_user_headers[20][100];
-  strcpy(github_user_headers[0], "Accept: application/json");
+  strcpy(github_user_headers[0], "Accept: */*");
   strcpy(github_user_headers[1], "Authorization: Bearer ");
   strcat(github_user_headers[1], token.access_token);
-  strcpy(github_user_headers[2], "User-Agent: Mozilla/5.0 (X11; Linux x86_64; "
-                                 "rv:144.0) Gecko/20100101 Firefox/144.0");
+  strcpy(github_user_headers[2], "User-Agent: Wikigen-Auth-C");
 
   char *githubUserResponse =
-      perform_curl_request(githubUserUrl, "GET", headers);
+      perform_curl_request(githubUserUrl, "GET", github_user_headers);
   if (!githubUserResponse) {
     send(client_fd, "Failed to perform request",
          strlen("Failed to perform request"), 0);
