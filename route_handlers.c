@@ -143,8 +143,6 @@ void handle_authorize(int client_fd, struct Request *request) {
     return;
   }
 
-  printf("Response: %s\n", githubUserResponse);
-
   cJSON *user_json = cJSON_Parse(githubUserResponse);
   if (user_json == NULL) {
     send(client_fd, "Failed to parse JSON", strlen("Failed to parse JSON"), 0);
@@ -161,8 +159,77 @@ void handle_authorize(int client_fd, struct Request *request) {
   }
 
   cJSON *user_id = cJSON_GetObjectItem(user_json, "id");
+  cJSON *user_login = cJSON_GetObjectItem(user_json, "login");
+  // Rule select query in turso
+  libsql_connection_t conn = get_db_connection();
+  if (conn.err) {
+    fprintf(stderr, "Failed to get database connection: %s\n",
+            libsql_error_message(conn.err));
+    return;
+  }
 
-  printf("User ID: %lld\n", (long long)user_id->valueint);
+  libsql_statement_t query_stmt =
+      libsql_connection_prepare(conn, "SELECT * FROM user WHERE github_id = ?");
+  libsql_statement_bind_value(query_stmt, libsql_integer(user_id->valueint));
+  if (query_stmt.err) {
+    fprintf(stderr, "Error preparing query: %s\n",
+            libsql_error_message(query_stmt.err));
+  }
+
+  libsql_rows_t rows = libsql_statement_query(query_stmt);
+  if (rows.err) {
+    fprintf(stderr, "Error executing query: %s\n",
+            libsql_error_message(rows.err));
+  }
+
+  printf("Select Statement Executed\n");
+
+  libsql_row_t row;
+  if (!(row = libsql_rows_next(rows)).err && !libsql_row_empty(row)) {
+    libsql_statement_t update_stmt = libsql_connection_prepare(
+        conn, "UPDATE User SET access_token = ? WHERE github_id = ?");
+    libsql_statement_bind_value(
+        update_stmt,
+        libsql_text(token.access_token, strlen(token.access_token)));
+    libsql_statement_bind_value(update_stmt, libsql_integer(user_id->valueint));
+    if (update_stmt.err) {
+      fprintf(stderr, "Error preparing query: %s\n",
+              libsql_error_message(update_stmt.err));
+    }
+
+    libsql_statement_execute(update_stmt);
+    printf("Update Statement Executed\n");
+    libsql_statement_deinit(update_stmt);
+  } else {
+    libsql_statement_t insert_stmt = libsql_connection_prepare(
+        conn, "INSERT INTO User (username, github_id, access_token) VALUES (?, "
+              "?, ?)");
+    libsql_statement_bind_value(
+        insert_stmt,
+        libsql_text(user_login->valuestring, strlen(user_login->valuestring)));
+    libsql_statement_bind_value(insert_stmt, libsql_integer(user_id->valueint));
+    libsql_statement_bind_value(
+        insert_stmt,
+        libsql_text(token.access_token, strlen(token.access_token)));
+    if (insert_stmt.err) {
+      fprintf(stderr, "Error preparing query: %s\n",
+              libsql_error_message(insert_stmt.err));
+    }
+    libsql_statement_execute(insert_stmt);
+    printf("Update Statement Executed\n");
+    libsql_statement_deinit(insert_stmt);
+  }
+
+  libsql_statement_deinit(query_stmt);
+
+  cJSON *user_avatar_url = cJSON_GetObjectItem(user_json, "avatar_url");
+
+  struct Payload *payload = malloc(sizeof(struct Payload));
+  payload->user_name = user_login->valuestring;
+  payload->avatar = user_avatar_url->valuestring;
+
+  char *created_token = create_jwt(payload);
+  printf("Token Created: %s\n", created_token);
 
   // Cleanup
   cJSON_Delete(json);
