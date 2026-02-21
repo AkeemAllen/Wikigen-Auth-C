@@ -25,6 +25,38 @@ char *get_method(char first_char, char second_char) {
   return "";
 }
 
+char *get_resource_path(char *buffer, int skip) {
+  char *resource_path = (char *)malloc(1024 * sizeof(char));
+  int buffer_size = strlen(buffer);
+
+  for (int i = skip; i < buffer_size; i++) {
+    if (buffer[i] == ' ' || buffer[i] == '?') {
+      resource_path[i - skip] = '\0';
+      break;
+    }
+
+    resource_path[i - skip] = buffer[i];
+  }
+
+  return resource_path;
+}
+
+char *get_query_string(char *buffer, int skip) {
+  char *query_string = (char *)malloc(1024 * sizeof(char));
+  int buffer_size = strlen(buffer);
+
+  for (int i = skip; i < buffer_size; i++) {
+    if (buffer[i] == ' ') {
+      query_string[i - skip] = '\0';
+      break;
+    }
+
+    query_string[i - skip] = buffer[i];
+  }
+
+  return query_string;
+}
+
 struct Request *parse_request(char *buffer) {
   struct Request *request = (struct Request *)malloc(sizeof(struct Request));
 
@@ -36,36 +68,9 @@ struct Request *parse_request(char *buffer) {
   }
   int method_size = strlen(request->method) + WHITESPACE_SKIP;
 
-  request->resource_path = (char *)malloc(1024 * sizeof(char));
-
-  char *query_string;
-  // TODO: This is horribly written, fix it
-  int buffer_size = strlen(buffer);
-  for (int i = method_size; i < (int)buffer_size; i++) {
-    if (buffer[i] == ' ') {
-      request->resource_path[i - method_size] = '\0';
-      break;
-    }
-
-    if (buffer[i] == '?') {
-      query_string = (char *)malloc(strlen(buffer) * sizeof(char));
-      int skipped_path_length =
-          strlen(request->resource_path) + method_size + 1;
-
-      for (size_t i = skipped_path_length; i < strlen(buffer); i++) {
-        if (buffer[i] == ' ') {
-          request->resource_path[i - method_size] = '\0';
-          query_string[i - skipped_path_length] = '\0';
-          break;
-        }
-
-        query_string[i - skipped_path_length] = buffer[i];
-      }
-      break;
-    }
-
-    request->resource_path[i - method_size] = buffer[i];
-  }
+  request->resource_path = get_resource_path(buffer, method_size);
+  char *query_string = get_query_string(buffer, strlen(request->resource_path) +
+                                                    method_size + 1);
 
   if (strlen(query_string) > 0) {
     char *param;
