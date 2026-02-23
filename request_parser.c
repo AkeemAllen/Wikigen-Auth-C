@@ -58,10 +58,13 @@ char *get_query_string(char *buffer, int skip) {
 }
 
 struct Request *parse_request(char *buffer) {
-  struct Request *request = (struct Request *)malloc(sizeof(struct Request));
+  struct Request *request =
+      (struct Request *)calloc(12, sizeof(struct Request));
+  request->error = NULL;
 
   // Able to determine method from first two characters
   request->method = get_method(buffer[0], buffer[1]);
+
   if (strcmp(request->method, "") == 0) {
     request->error = "Invalid HTTP Method";
     return request;
