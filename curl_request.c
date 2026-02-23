@@ -29,7 +29,6 @@ char *perform_curl_request(const char *url, const char *method,
     }
     headers = curl_slist_append(headers, received_headers[i]);
   }
-  headers = curl_slist_append(headers, "Accept: application/json");
   curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
 
   CURLcode res = curl_easy_perform(curl);

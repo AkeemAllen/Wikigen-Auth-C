@@ -1,5 +1,6 @@
 #include "db.h"
 #include "request_parser.h"
+#include "response_builder.h"
 #include "router.h"
 #include <errno.h>
 #include <netinet/in.h>
@@ -8,6 +9,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
+#include <time.h>
 #include <unistd.h>
 
 #define PORT 8080
@@ -91,30 +93,29 @@ void *handle_client_request(void *arg) {
   ssize_t bytes_received = recv(client_fd, buffer, BUFFER_SIZE, 0);
 
   if (bytes_received < 0) {
-    send(client_fd, "Improper Header", strlen("Improper Header"), 0);
+    send_response(client_fd, 400, CONTENT_TYPE_TEXT, "Improper Header");
     free(buffer);
     return NULL;
   }
   buffer[bytes_received] = '\0';
 
   struct Request *request = parse_request(buffer);
+
   if (request->error != NULL) {
-    send(client_fd, request->error, strlen(request->error), 0);
+    send_response(client_fd, 400, CONTENT_TYPE_TEXT, request->error);
     free(request);
     free(buffer);
     return NULL;
   }
 
   int routed = route_request(client_fd, request);
-  if (routed < 0) {
-    send(client_fd, "No route found", strlen("No route found"), 0);
-    free(request);
-    free(buffer);
-    return NULL;
-  }
 
+  if (routed < 0) {
+    send_response(client_fd, 404, CONTENT_TYPE_TEXT, "No route found");
+  }
   free(request);
   free(buffer);
+  printf("\n");
 
   return NULL;
 }

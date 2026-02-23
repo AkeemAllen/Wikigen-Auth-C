@@ -35,20 +35,6 @@ int add_child_route(struct RouteNode *parent, struct RouteNode *child) {
   return 0;
 }
 
-void print_router(struct RouteNode *node, int level) {
-  if (!node)
-    return;
-
-  for (int i = 0; i < level; i++)
-    printf("|  ");
-
-  printf("- %s\n", node->segment);
-  // if (node->handler)
-  // node->handler(0, NULL, NULL);
-  for (int i = 0; i < (int)node->child_count; i++)
-    print_router(node->children[i], level + 1);
-}
-
 struct RouteNode *find_route(struct RouteNode *node, char *segment) {
   if (node->segment == NULL) {
     return NULL;
@@ -83,7 +69,6 @@ int route_request(int client_fd, struct Request *request) {
       return 0;
     }
   }
-  send(client_fd, "No route found", strlen("No route found"), 0);
   return -1;
 }
 
@@ -93,7 +78,9 @@ void init_routes() {
       create_route_node("create_repo", handle_create_repo);
   struct RouteNode *authorize =
       create_route_node("authorize", handle_authorize);
+  struct RouteNode *test = create_route_node("test", handle_test);
 
   add_child_route(g_router, create_repo);
   add_child_route(g_router, authorize);
+  add_child_route(g_router, test);
 }

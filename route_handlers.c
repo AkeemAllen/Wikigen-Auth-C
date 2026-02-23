@@ -1,11 +1,19 @@
 #include "route_handlers.h"
+#include "response_builder.h"
 
-void handle_root(int client_fd, struct Request *request) {}
+void handle_root(int client_fd, struct Request *request) {
+  send_response(client_fd, 200, CONTENT_TYPE_TEXT, "Welcome to Wikigen-Auth");
+}
+
+void handle_test(int client_fd, struct Request *request) {
+  send_response(client_fd, 200, CONTENT_TYPE_TEXT, "Test");
+  printf("Test\n");
+}
 
 void handle_create_repo(int client_fd, struct Request *request) {
   cJSON *json = cJSON_Parse(request->body);
   if (json == NULL) {
-    send(client_fd, "Failed to parse JSON", strlen("Failed to parse JSON"), 0);
+    send_response(client_fd, 400, CONTENT_TYPE_TEXT, "Failed to parse JSON");
     return;
   }
   cJSON *token = cJSON_GetObjectItem(json, "token");
@@ -13,7 +21,7 @@ void handle_create_repo(int client_fd, struct Request *request) {
 
   struct Payload *payload = verify_jwt(token->valuestring);
   if (payload == NULL) {
-    send(client_fd, "Failed to verify JWT", strlen("Failed to verify JWT"), 0);
+    send_response(client_fd, 401, CONTENT_TYPE_TEXT, "Failed to verify JWT");
     return;
   }
 
@@ -71,8 +79,7 @@ void handle_authorize(int client_fd, struct Request *request) {
   }
 
   if (code == NULL || strlen(code) == 0) {
-    char *error = "Code Parameter is undefined";
-    send(client_fd, error, strlen(error), 0);
+    send_response(client_fd, 400, CONTENT_TYPE_TEXT, "Code Parameter is undefined");
     return;
   }
 
@@ -88,18 +95,18 @@ void handle_authorize(int client_fd, struct Request *request) {
            clientID, clientSecret, code);
 
   char headers[20][100];
-  strcpy(headers[0], "Accept: application/json");
+  strncpy(headers[0], "Accept: application/json",
+          strlen("Accept: application/json") + 1);
 
   char *response = perform_curl_request(githubOauthUrl, "POST", headers);
   if (!response) {
-    send(client_fd, "Failed to perform request",
-         strlen("Failed to perform request"), 0);
+    send_response(client_fd, 500, CONTENT_TYPE_TEXT, "Failed to perform request");
     return;
   }
 
   cJSON *json = cJSON_Parse(response);
   if (json == NULL) {
-    send(client_fd, "Failed to parse JSON", strlen("Failed to parse JSON"), 0);
+    send_response(client_fd, 400, CONTENT_TYPE_TEXT, "Failed to parse JSON");
     free(response);
     return;
   }
@@ -107,7 +114,7 @@ void handle_authorize(int client_fd, struct Request *request) {
   cJSON *error_item = cJSON_GetObjectItem(json, "error");
   if (error_item != NULL) {
     printf("Error: %s\n", error_item->valuestring);
-    send(client_fd, "Error", strlen("Error"), 0);
+    send_response(client_fd, 401, CONTENT_TYPE_TEXT, "Error");
     free(response);
     return;
   }
@@ -128,24 +135,25 @@ void handle_authorize(int client_fd, struct Request *request) {
   char githubUserUrl[512];
   snprintf(githubUserUrl, sizeof(githubUserUrl), "https://api.github.com/user");
 
-  char github_user_headers[20][100];
-  strcpy(github_user_headers[0], "Accept: */*");
-  strcpy(github_user_headers[1], "Authorization: Bearer ");
-  strcat(github_user_headers[1], token.access_token);
-  strcpy(github_user_headers[2], "User-Agent: Wikigen-Auth-C");
+  strncpy(headers[0], "Accept: application/json",
+          strlen("Accept: application/json") + 1);
+  strncpy(headers[1], "Authorization: Bearer ",
+          strlen("Authorization: Bearer ") + 1);
+  strncat(headers[1], token.access_token, strlen(token.access_token) + 1);
+  strncpy(headers[2], "User-Agent: Wikigen-Auth-C",
+          strlen("User-Agent: Wikigen-Auth-C") + 1);
 
   char *githubUserResponse =
-      perform_curl_request(githubUserUrl, "GET", github_user_headers);
+      perform_curl_request(githubUserUrl, "GET", headers);
   if (!githubUserResponse) {
-    send(client_fd, "Failed to perform request",
-         strlen("Failed to perform request"), 0);
+    send_response(client_fd, 500, CONTENT_TYPE_TEXT, "Failed to perform request");
     free(githubUserResponse);
     return;
   }
 
   cJSON *user_json = cJSON_Parse(githubUserResponse);
   if (user_json == NULL) {
-    send(client_fd, "Failed to parse JSON", strlen("Failed to parse JSON"), 0);
+    send_response(client_fd, 400, CONTENT_TYPE_TEXT, "Failed to parse JSON");
     free(githubUserResponse);
     return;
   }
@@ -153,7 +161,7 @@ void handle_authorize(int client_fd, struct Request *request) {
   cJSON *user_error_item = cJSON_GetObjectItem(user_json, "error");
   if (user_error_item != NULL) {
     printf("Error: %s\n", user_error_item->valuestring);
-    send(client_fd, "Error", strlen("Error"), 0);
+    send_response(client_fd, 401, CONTENT_TYPE_TEXT, "Error");
     free(githubUserResponse);
     return;
   }
@@ -238,5 +246,6 @@ void handle_authorize(int client_fd, struct Request *request) {
   cJSON_Delete(user_json);
   free(githubUserResponse);
 
-  send(client_fd, "Authorized", strlen("Authorized"), 0);
+  send_response(client_fd, 200, CONTENT_TYPE_TEXT, created_token);
+  return;
 }
