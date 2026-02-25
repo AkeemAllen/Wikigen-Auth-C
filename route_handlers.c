@@ -1,5 +1,63 @@
 #include "route_handlers.h"
 #include "response_builder.h"
+#include <stdio.h>
+
+// AI generated function
+char *load_html_with_token(const char *token_value) {
+  // --- Read file into buffer ---
+  FILE *f = fopen("code.html", "rb");
+  if (!f) {
+    perror("fopen");
+    return NULL;
+  }
+
+  fseek(f, 0, SEEK_END);
+  long file_size = ftell(f);
+  rewind(f);
+
+  char *file_buf = malloc(file_size + 1);
+  if (!file_buf) {
+    fclose(f);
+    return NULL;
+  }
+
+  if (fread(file_buf, 1, file_size, f) != (size_t)file_size) {
+    free(file_buf);
+    fclose(f);
+    return NULL;
+  }
+  file_buf[file_size] = '\0';
+  fclose(f);
+
+  // --- Replace ${token} with token_value ---
+  const char *placeholder = "${token}";
+  size_t placeholder_len = strlen(placeholder);
+  size_t token_len = strlen(token_value);
+
+  // Find the placeholder
+  char *pos = strstr(file_buf, placeholder);
+  if (!pos) {
+    // No placeholder found — return file as-is
+    return file_buf;
+  }
+
+  // Allocate output buffer
+  size_t new_size = file_size - placeholder_len + token_len + 1;
+  char *out_buf = malloc(new_size);
+  if (!out_buf) {
+    free(file_buf);
+    return NULL;
+  }
+
+  // Build the result: part before + token + part after
+  size_t prefix_len = pos - file_buf;
+  memcpy(out_buf, file_buf, prefix_len);
+  memcpy(out_buf + prefix_len, token_value, token_len);
+  strcpy(out_buf + prefix_len + token_len, pos + placeholder_len);
+
+  free(file_buf);
+  return out_buf;
+}
 
 void handle_root(int client_fd, struct Request *request) {
   send_response(client_fd, 200, CONTENT_TYPE_TEXT, "Welcome to Wikigen-Auth");
@@ -73,21 +131,19 @@ void handle_authorize(int client_fd, struct Request *request) {
   char *code = NULL;
   for (int i = 0; i < request->param_count; i++) {
     if (strcmp(request->query_param_keys[i], "code") == 0) {
-      printf("Code: %s\n", request->query_param_values[i]);
       code = strdup(request->query_param_values[i]);
     }
   }
 
   if (code == NULL || strlen(code) == 0) {
-    send_response(client_fd, 400, CONTENT_TYPE_TEXT, "Code Parameter is undefined");
+    send_response(client_fd, 400, CONTENT_TYPE_TEXT,
+                  "Code Parameter is undefined");
     return;
   }
 
   char *clientSecret = get_env_value("CLIENT_SECRET");
   char *clientID = get_env_value("CLIENT_ID");
 
-  // Move Curl implementation into a separate function
-  // For now, it should take, URL, method and return the response
   char githubOauthUrl[512];
   snprintf(githubOauthUrl, sizeof(githubOauthUrl),
            "https://github.com/login/oauth/access_token?"
@@ -95,12 +151,12 @@ void handle_authorize(int client_fd, struct Request *request) {
            clientID, clientSecret, code);
 
   char headers[20][100];
-  strncpy(headers[0], "Accept: application/json",
-          strlen("Accept: application/json") + 1);
+  snprintf(headers[0], sizeof(headers[0]), "Accept: application/json");
 
   char *response = perform_curl_request(githubOauthUrl, "POST", headers);
   if (!response) {
-    send_response(client_fd, 500, CONTENT_TYPE_TEXT, "Failed to perform request");
+    send_response(client_fd, 500, CONTENT_TYPE_TEXT,
+                  "Failed to perform request");
     return;
   }
 
@@ -135,18 +191,16 @@ void handle_authorize(int client_fd, struct Request *request) {
   char githubUserUrl[512];
   snprintf(githubUserUrl, sizeof(githubUserUrl), "https://api.github.com/user");
 
-  strncpy(headers[0], "Accept: application/json",
-          strlen("Accept: application/json") + 1);
-  strncpy(headers[1], "Authorization: Bearer ",
-          strlen("Authorization: Bearer ") + 1);
+  snprintf(headers[0], sizeof(headers[0]), "Accept: application/json");
+  snprintf(headers[1], sizeof(headers[1]), "Authorization: Bearer ");
   strncat(headers[1], token.access_token, strlen(token.access_token) + 1);
-  strncpy(headers[2], "User-Agent: Wikigen-Auth-C",
-          strlen("User-Agent: Wikigen-Auth-C") + 1);
+  snprintf(headers[2], sizeof(headers[2]), "User-Agent: Wikigen-Auth-C");
 
   char *githubUserResponse =
       perform_curl_request(githubUserUrl, "GET", headers);
   if (!githubUserResponse) {
-    send_response(client_fd, 500, CONTENT_TYPE_TEXT, "Failed to perform request");
+    send_response(client_fd, 500, CONTENT_TYPE_TEXT,
+                  "Failed to perform request");
     free(githubUserResponse);
     return;
   }
@@ -206,7 +260,6 @@ void handle_authorize(int client_fd, struct Request *request) {
     }
 
     libsql_statement_execute(update_stmt);
-    printf("Update Statement Executed\n");
     libsql_statement_deinit(update_stmt);
   } else {
     libsql_statement_t insert_stmt = libsql_connection_prepare(
@@ -224,7 +277,6 @@ void handle_authorize(int client_fd, struct Request *request) {
               libsql_error_message(insert_stmt.err));
     }
     libsql_statement_execute(insert_stmt);
-    printf("Update Statement Executed\n");
     libsql_statement_deinit(insert_stmt);
   }
 
@@ -237,7 +289,6 @@ void handle_authorize(int client_fd, struct Request *request) {
   payload->avatar = user_avatar_url->valuestring;
 
   char *created_token = create_jwt(payload);
-  printf("Token Created: %s\n", created_token);
 
   // Cleanup
   cJSON_Delete(json);
@@ -246,6 +297,12 @@ void handle_authorize(int client_fd, struct Request *request) {
   cJSON_Delete(user_json);
   free(githubUserResponse);
 
-  send_response(client_fd, 200, CONTENT_TYPE_TEXT, created_token);
+  char *html = load_html_with_token(created_token);
+  if (!html) {
+    fprintf(stderr, "Failed to load HTML\n");
+    return;
+  }
+
+  send_response(client_fd, 200, CONTENT_TYPE_HTML, html);
   return;
 }

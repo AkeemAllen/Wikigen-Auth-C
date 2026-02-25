@@ -2,14 +2,11 @@
 #include "request_parser.h"
 #include "response_builder.h"
 #include "router.h"
-#include <errno.h>
 #include <netinet/in.h>
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 #include <sys/socket.h>
-#include <time.h>
 #include <unistd.h>
 
 #define PORT 8080
@@ -24,7 +21,6 @@ int main(int argc, char *argv[]) {
     return 1;
   }
 
-  int server_fd;
   ssize_t valread;
   struct sockaddr_in server_address;
   int opt = 1;
@@ -33,15 +29,13 @@ int main(int argc, char *argv[]) {
   char buffer[1024] = {0};
   char *hello = "Hello";
 
-  server_fd = socket(AF_INET, SOCK_STREAM, 0);
+  int server_fd = socket(AF_INET, SOCK_STREAM, 0);
   if (server_fd < 0) {
     perror("socket failed");
     exit(EXIT_FAILURE);
   }
 
-  int options_set =
-      setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
-  if (options_set) {
+  if (setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt))) {
     perror("bind failed");
     exit(EXIT_FAILURE);
   }
@@ -50,9 +44,8 @@ int main(int argc, char *argv[]) {
   server_address.sin_addr.s_addr = INADDR_ANY;
   server_address.sin_port = htons(PORT);
 
-  int is_binded = bind(server_fd, (struct sockaddr *)&server_address,
-                       sizeof(server_address));
-  if (is_binded < 0) {
+  if (bind(server_fd, (struct sockaddr *)&server_address,
+           sizeof(server_address)) < 0) {
     perror("bind failed");
     exit(EXIT_FAILURE);
   }
