@@ -1,2 +1,0 @@
-[2026-02-28 14:25:11] [INFO ] wikigen_auth.c:62 | Server is listening on port 8080
-[2026-02-28 14:27:04] [ERROR] router.c:64 | No route found for favicon.ico
