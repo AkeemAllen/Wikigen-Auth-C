@@ -1,4 +1,5 @@
 #include "router.h"
+#include "log.h"
 #include "route_handlers.h"
 
 static struct RouteNode *g_router;
@@ -60,7 +61,7 @@ int route_request(int client_fd, struct Request *request) {
     current_node = find_route(current_node, request->segments[i]);
 
     if (current_node == NULL) {
-      printf("No route found for %s\n", request->segments[i]);
+      LOG_ERROR("No route found for %s", request->segments[i]);
       return -1;
     }
 

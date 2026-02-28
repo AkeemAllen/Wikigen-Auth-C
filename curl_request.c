@@ -1,4 +1,5 @@
 #include "curl_request.h"
+#include "log.h"
 
 char *perform_curl_request(const char *url, const char *method,
                            char received_headers[20][100]) {
@@ -51,7 +52,7 @@ size_t write_callback(void *contents, size_t size, size_t nmemb, void *userp) {
 
   char *ptr = realloc(resp->data, resp->size + real_size + 1);
   if (ptr == NULL) {
-    printf("Not enough memory (realloc failed)\n");
+    LOG_ERROR("Not enough memory (realloc failed)");
     return 0;
   }
 

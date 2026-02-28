@@ -1,4 +1,5 @@
 #include "route_handlers.h"
+#include "log.h"
 #include "response_builder.h"
 #include <stdio.h>
 
