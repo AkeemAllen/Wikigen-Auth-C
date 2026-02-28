@@ -1,4 +1,5 @@
 #include "db.h"
+#include "log.h"
 
 libsql_database_t db;
 libsql_connection_t conn;
@@ -13,15 +14,15 @@ bool init_db() {
       (libsql_database_desc_t){.url = db_url, .auth_token = auth_token});
 
   if (db.err) {
-    fprintf(stderr, "Failed to initialize database: %s\n",
-            libsql_error_message(db.err));
+    LOG_ERROR("Failed to initialize database: %s",
+              libsql_error_message(db.err));
     return false;
   }
 
   conn = libsql_database_connect(db);
   if (conn.err) {
-    fprintf(stderr, "Failed to connect to database: %s\n",
-            libsql_error_message(conn.err));
+    LOG_ERROR("Failed to connect to database: %s",
+              libsql_error_message(conn.err));
     return false;
   }
 

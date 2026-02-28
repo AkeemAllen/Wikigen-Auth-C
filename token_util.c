@@ -1,4 +1,5 @@
 #include "token_util.h"
+#include "log.h"
 
 char *get_jwks() {
   FILE *file = fopen("JWKS.json", "r");
@@ -32,7 +33,7 @@ char *create_jwt(struct Payload *payload) {
   jwt_builder_t *builder = jwt_builder_new();
 
   if (builder == NULL) {
-    printf("Failed to create JWT builder\n");
+    LOG_ERROR("Failed to create JWT builder");
     return NULL;
   }
 
@@ -91,7 +92,7 @@ struct Payload *verify_jwt(char *token) {
   jwt_checker_t *checker = jwt_checker_new();
 
   if (checker == NULL) {
-    printf("Failed to create JWT checker\n");
+    LOG_ERROR("Failed to create JWT checker");
     return NULL;
   }
 

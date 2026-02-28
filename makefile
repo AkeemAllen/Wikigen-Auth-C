@@ -8,7 +8,7 @@ SOURCES := $(wildcard *.c)
 OBJECTS := $(patsubst %.c,$(BUILDDIR)/%.o,$(SOURCES))
 EXECUTABLE := $(BUILDDIR)/wikigen_auth
 
-all: $(BUILDDIR) $(EXECUTABLE)
+all: $(BUILDDIR) logs $(EXECUTABLE)
 
 $(EXECUTABLE): $(OBJECTS)
 	$(CC) $(OBJECTS) -o $@ $(LIBFLAGS) 
@@ -19,6 +19,9 @@ $(BUILDDIR)/%.o: %.c
 # Rule to create the build directory
 $(BUILDDIR):
 	mkdir -p $(BUILDDIR)
+
+logs:
+	mkdir -p logs
 
 clean:
 	rm -rf $(BUILDDIR)

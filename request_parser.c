@@ -57,36 +57,31 @@ char *get_query_string(char *buffer, int skip) {
   return query_string;
 }
 
-struct Request *parse_request(char *buffer) {
-  struct Request *request =
-      (struct Request *)calloc(12, sizeof(struct Request));
-  request->error = NULL;
-
+RequestParserError parse_request(char *buffer, struct Request *out) {
   // Able to determine method from first two characters
-  request->method = get_method(buffer[0], buffer[1]);
+  out->method = get_method(buffer[0], buffer[1]);
 
-  if (strcmp(request->method, "") == 0) {
-    request->error = "Invalid HTTP Method";
-    return request;
+  if (strcmp(out->method, "") == 0) {
+    return INVALID_HTTP_METHOD;
   }
-  int method_size = strlen(request->method) + WHITESPACE_SKIP;
+  int method_size = strlen(out->method) + WHITESPACE_SKIP;
 
-  request->resource_path = get_resource_path(buffer, method_size);
-  char *query_string = get_query_string(buffer, strlen(request->resource_path) +
-                                                    method_size + 1);
+  out->resource_path = get_resource_path(buffer, method_size);
+  char *query_string =
+      get_query_string(buffer, strlen(out->resource_path) + method_size + 1);
 
   if (strlen(query_string) > 0) {
     char *param;
-    request->param_count = 0;
+    out->param_count = 0;
 
     while ((param = strsep(&query_string, "&")) != NULL &&
-           request->param_count < 32) {
+           out->param_count < 32) {
       char *equals = strchr(param, '=');
       if (equals != NULL) {
         *equals = '\0';
-        request->query_param_keys[request->param_count] = param;
-        request->query_param_values[request->param_count] = equals + 1;
-        request->param_count++;
+        out->query_param_keys[out->param_count] = param;
+        out->query_param_values[out->param_count] = equals + 1;
+        out->param_count++;
       }
     }
     free(query_string);
@@ -94,8 +89,7 @@ struct Request *parse_request(char *buffer) {
 
   char *header;
   int empty_header_count = 0;
-  while ((header = strsep(&buffer, "\r\n")) != NULL &&
-         request->header_count < 32) {
+  while ((header = strsep(&buffer, "\r\n")) != NULL && out->header_count < 32) {
     if (strstr(header, "HTTP/1.1") != NULL) {
       continue;
     }
@@ -112,32 +106,31 @@ struct Request *parse_request(char *buffer) {
 
     char *colon = strchr(header, ':');
     if (colon == NULL) {
-      request->error = "Invalid Header";
-      return request;
+      return INVALID_HEADER;
     }
     *colon = '\0';
-    request->header_keys[request->header_count] = header;
-    request->header_values[request->header_count] = colon + 1;
-    request->header_count++;
+    out->header_keys[out->header_count] = header;
+    out->header_values[out->header_count] = colon + 1;
+    out->header_count++;
   }
 
   if (buffer != NULL) {
     if (buffer[0] == '\n') {
       buffer++;
     }
-    request->body = buffer;
+    out->body = buffer;
   }
 
   char *token;
-  char *url_path_copy = strdup(request->resource_path);
-  request->segment_count = 0;
+  char *url_path_copy = strdup(out->resource_path);
+  out->segment_count = 0;
   while ((token = strsep(&url_path_copy, "/")) != NULL) {
     if (strlen(token) == 0)
       continue;
-    request->segments[request->segment_count] = token;
-    request->segment_count++;
+    out->segments[out->segment_count] = token;
+    out->segment_count++;
   }
   free(url_path_copy);
 
-  return request;
+  return OK;
 }
