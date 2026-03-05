@@ -5,15 +5,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
+#include "error.h"
 #define BUFFER_SIZE 104857600
 
-typedef enum {
-  OK = 0,
-  INVALID_HTTP_METHOD,
-  INVALID_HEADER,
-} RequestParserError;
-
-struct Request {
+typedef struct {
     char *method;
     char *resource_path;
     char *header_keys[32];
@@ -25,7 +20,7 @@ struct Request {
     char *query_param_values[32];
     int param_count;
     char *body;
-};
+} Request;
 
-RequestParserError parse_request(char *buffer, struct Request *out);
+ErrorContext parse_request(char *buffer, Request *out);
 #endif

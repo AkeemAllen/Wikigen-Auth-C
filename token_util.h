@@ -7,12 +7,12 @@
 #include <jwt.h>
 #include "env.h"
 
-struct Payload {
+typedef struct {
   char *user_name;
   char *avatar;
-};
+} Payload;
 
-char *create_jwt(struct Payload *payload);
-struct Payload *verify_jwt(char *token);
+char *create_jwt(Payload *out);
+Payload *verify_jwt(char *token);
 
 #endif

@@ -1,7 +1,5 @@
 #include "route_handlers.h"
-#include "log.h"
-#include "response_builder.h"
-#include <stdio.h>
+#include <string.h>
 
 // AI generated function
 char *load_html_with_token(const char *token_value) {
@@ -60,16 +58,16 @@ char *load_html_with_token(const char *token_value) {
   return out_buf;
 }
 
-void handle_root(int client_fd, struct Request *request) {
+void handle_root(int client_fd, Request *request) {
   send_response(client_fd, 200, CONTENT_TYPE_TEXT, "Welcome to Wikigen-Auth");
 }
 
-void handle_test(int client_fd, struct Request *request) {
+void handle_test(int client_fd, Request *request) {
   send_response(client_fd, 200, CONTENT_TYPE_TEXT, "Test");
   printf("Test\n");
 }
 
-void handle_create_repo(int client_fd, struct Request *request) {
+void handle_create_repo(int client_fd, Request *request) {
   cJSON *json = cJSON_Parse(request->body);
   if (json == NULL) {
     send_response(client_fd, 400, CONTENT_TYPE_TEXT, "Failed to parse JSON");
@@ -78,7 +76,7 @@ void handle_create_repo(int client_fd, struct Request *request) {
   cJSON *token = cJSON_GetObjectItem(json, "token");
   cJSON *wiki_name = cJSON_GetObjectItem(json, "wikiName");
 
-  struct Payload *payload = verify_jwt(token->valuestring);
+  Payload *payload = verify_jwt(token->valuestring);
   if (payload == NULL) {
     send_response(client_fd, 401, CONTENT_TYPE_TEXT, "Failed to verify JWT");
     return;
@@ -128,20 +126,7 @@ typedef struct {
   char *scope;
 } AccessToken;
 
-void handle_authorize(int client_fd, struct Request *request) {
-  char *code = NULL;
-  for (int i = 0; i < request->param_count; i++) {
-    if (strcmp(request->query_param_keys[i], "code") == 0) {
-      code = strdup(request->query_param_values[i]);
-    }
-  }
-
-  if (code == NULL || strlen(code) == 0) {
-    send_response(client_fd, 400, CONTENT_TYPE_TEXT,
-                  "Code Parameter is undefined");
-    return;
-  }
-
+ErrorContext get_acces_token(AccessToken *out, char *code) {
   char *clientSecret = get_env_value("CLIENT_SECRET");
   char *clientID = get_env_value("CLIENT_ID");
 
@@ -156,73 +141,112 @@ void handle_authorize(int client_fd, struct Request *request) {
 
   char *response = perform_curl_request(githubOauthUrl, "POST", headers);
   if (!response) {
-    send_response(client_fd, 500, CONTENT_TYPE_TEXT,
-                  "Failed to perform request");
-    return;
+    return ERROR_CONTEXT(REQUEST_ERROR, "Failed to perform request");
   }
 
   cJSON *json = cJSON_Parse(response);
   if (json == NULL) {
-    send_response(client_fd, 400, CONTENT_TYPE_TEXT, "Failed to parse JSON");
     free(response);
-    return;
+    return ERROR_CONTEXT(INVALID_JSON, "Failed to parse JSON");
   }
 
-  cJSON *error_item = cJSON_GetObjectItem(json, "error");
-  if (error_item != NULL) {
-    printf("Error: %s\n", error_item->valuestring);
-    send_response(client_fd, 401, CONTENT_TYPE_TEXT, "Error");
-    free(response);
-    return;
-  }
-
-  // Parse into AccessToken struct
-  AccessToken token = {0};
   cJSON *access_token = cJSON_GetObjectItem(json, "access_token");
   cJSON *token_type = cJSON_GetObjectItem(json, "token_type");
   cJSON *scope = cJSON_GetObjectItem(json, "scope");
 
   if (access_token)
-    token.access_token = access_token->valuestring;
+    out->access_token = strdup(access_token->valuestring);
   if (token_type)
-    token.token_type = token_type->valuestring;
+    out->token_type = strdup(token_type->valuestring);
   if (scope)
-    token.scope = scope->valuestring;
+    out->scope = strdup(scope->valuestring);
 
+  cJSON_Delete(json);
+  free(response);
+
+  return ERROR_CONTEXT(OK, "OK");
+}
+
+typedef struct {
+  int32_t id;
+  char *user_name;
+  char *avatar;
+} UserInfo;
+
+ErrorContext get_user_info(UserInfo *out, char *access_token) {
   char githubUserUrl[512];
   snprintf(githubUserUrl, sizeof(githubUserUrl), "https://api.github.com/user");
 
+  char headers[20][100];
   snprintf(headers[0], sizeof(headers[0]), "Accept: application/json");
   snprintf(headers[1], sizeof(headers[1]), "Authorization: Bearer ");
-  strncat(headers[1], token.access_token, strlen(token.access_token) + 1);
+  strncat(headers[1], access_token, strlen(access_token) + 1);
   snprintf(headers[2], sizeof(headers[2]), "User-Agent: Wikigen-Auth-C");
 
-  char *githubUserResponse =
-      perform_curl_request(githubUserUrl, "GET", headers);
-  if (!githubUserResponse) {
-    send_response(client_fd, 500, CONTENT_TYPE_TEXT,
-                  "Failed to perform request");
-    free(githubUserResponse);
-    return;
+  char *response = perform_curl_request(githubUserUrl, "GET", headers);
+  if (!response) {
+    free(response);
+    return ERROR_CONTEXT(REQUEST_ERROR, "Failed to perform request");
   }
 
-  cJSON *user_json = cJSON_Parse(githubUserResponse);
+  cJSON *user_json = cJSON_Parse(response);
   if (user_json == NULL) {
-    send_response(client_fd, 400, CONTENT_TYPE_TEXT, "Failed to parse JSON");
-    free(githubUserResponse);
-    return;
-  }
-
-  cJSON *user_error_item = cJSON_GetObjectItem(user_json, "error");
-  if (user_error_item != NULL) {
-    printf("Error: %s\n", user_error_item->valuestring);
-    send_response(client_fd, 401, CONTENT_TYPE_TEXT, "Error");
-    free(githubUserResponse);
-    return;
+    LOG_ERROR("Failed to parse JSON");
+    free(response);
+    return ERROR_CONTEXT(INVALID_JSON, "Failed to parse JSON");
   }
 
   cJSON *user_id = cJSON_GetObjectItem(user_json, "id");
   cJSON *user_login = cJSON_GetObjectItem(user_json, "login");
+  cJSON *user_avatar_url = cJSON_GetObjectItem(user_json, "avatar_url");
+
+  if (user_id)
+    out->id = user_id->valueint;
+  if (user_login)
+    out->user_name = strdup(user_login->valuestring);
+  if (user_avatar_url)
+    out->avatar = strdup(user_avatar_url->valuestring);
+
+  cJSON_Delete(user_json);
+  free(response);
+
+  return ERROR_CONTEXT(OK, "OK");
+}
+
+void handle_authorize(int client_fd, Request *request) {
+  char *code = NULL;
+  char error_response[512];
+
+  for (int i = 0; i < request->param_count; i++) {
+    if (strcmp(request->query_param_keys[i], "code") == 0) {
+      code = strdup(request->query_param_values[i]);
+    }
+  }
+
+  if (code == NULL || strlen(code) == 0) {
+    send_response(client_fd, 400, CONTENT_TYPE_TEXT,
+                  "Code Parameter is undefined");
+    return;
+  }
+
+  AccessToken token = {0};
+  ErrorContext token_error = get_acces_token(&token, code);
+  if (token_error.code != OK) {
+    snprintf(error_response, sizeof(error_response),
+             "Error retrieving access token: %s", token_error.message);
+    send_response(client_fd, 500, CONTENT_TYPE_TEXT, error_response);
+    return;
+  }
+
+  UserInfo user_info = {0};
+  ErrorContext user_info_error = get_user_info(&user_info, token.access_token);
+  if (user_info_error.code != OK) {
+    snprintf(error_response, sizeof(error_response),
+             "Error retrieving user info: %s", user_info_error.message);
+    send_response(client_fd, 500, CONTENT_TYPE_TEXT, error_response);
+    return;
+  }
+
   // Rule select query in turso
   libsql_connection_t conn = get_db_connection();
   if (conn.err) {
@@ -233,7 +257,7 @@ void handle_authorize(int client_fd, struct Request *request) {
 
   libsql_statement_t query_stmt =
       libsql_connection_prepare(conn, "SELECT * FROM user WHERE github_id = ?");
-  libsql_statement_bind_value(query_stmt, libsql_integer(user_id->valueint));
+  libsql_statement_bind_value(query_stmt, libsql_integer(user_info.id));
   if (query_stmt.err) {
     fprintf(stderr, "Error preparing query: %s\n",
             libsql_error_message(query_stmt.err));
@@ -245,8 +269,6 @@ void handle_authorize(int client_fd, struct Request *request) {
             libsql_error_message(rows.err));
   }
 
-  printf("Select Statement Executed\n");
-
   libsql_row_t row;
   if (!(row = libsql_rows_next(rows)).err && !libsql_row_empty(row)) {
     libsql_statement_t update_stmt = libsql_connection_prepare(
@@ -254,7 +276,7 @@ void handle_authorize(int client_fd, struct Request *request) {
     libsql_statement_bind_value(
         update_stmt,
         libsql_text(token.access_token, strlen(token.access_token)));
-    libsql_statement_bind_value(update_stmt, libsql_integer(user_id->valueint));
+    libsql_statement_bind_value(update_stmt, libsql_integer(user_info.id));
     if (update_stmt.err) {
       fprintf(stderr, "Error preparing query: %s\n",
               libsql_error_message(update_stmt.err));
@@ -268,8 +290,8 @@ void handle_authorize(int client_fd, struct Request *request) {
               "?, ?)");
     libsql_statement_bind_value(
         insert_stmt,
-        libsql_text(user_login->valuestring, strlen(user_login->valuestring)));
-    libsql_statement_bind_value(insert_stmt, libsql_integer(user_id->valueint));
+        libsql_text(user_info.user_name, strlen(user_info.user_name)));
+    libsql_statement_bind_value(insert_stmt, libsql_integer(user_info.id));
     libsql_statement_bind_value(
         insert_stmt,
         libsql_text(token.access_token, strlen(token.access_token)));
@@ -283,26 +305,24 @@ void handle_authorize(int client_fd, struct Request *request) {
 
   libsql_statement_deinit(query_stmt);
 
-  cJSON *user_avatar_url = cJSON_GetObjectItem(user_json, "avatar_url");
+  Payload payload = {0};
+  payload.user_name = user_info.user_name;
+  payload.avatar = user_info.avatar;
 
-  struct Payload *payload = malloc(sizeof(struct Payload));
-  payload->user_name = user_login->valuestring;
-  payload->avatar = user_avatar_url->valuestring;
-
-  char *created_token = create_jwt(payload);
-
-  // Cleanup
-  cJSON_Delete(json);
-  free(response);
-
-  cJSON_Delete(user_json);
-  free(githubUserResponse);
+  char *created_token = create_jwt(&payload);
 
   char *html = load_html_with_token(created_token);
   if (!html) {
-    fprintf(stderr, "Failed to load HTML\n");
+    LOG_ERROR("Failed to load HTML");
+    send_response(client_fd, 500, CONTENT_TYPE_TEXT, "Failed to load HTML");
     return;
   }
+
+  free(token.access_token);
+  free(token.token_type);
+  free(token.scope);
+  free(user_info.user_name);
+  free(user_info.avatar);
 
   send_response(client_fd, 200, CONTENT_TYPE_HTML, html);
   return;

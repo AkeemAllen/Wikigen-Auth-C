@@ -29,7 +29,7 @@ char *get_jwks() {
   return jwks;
 }
 
-char *create_jwt(struct Payload *payload) {
+char *create_jwt(Payload *out) {
   jwt_builder_t *builder = jwt_builder_new();
 
   if (builder == NULL) {
@@ -38,9 +38,9 @@ char *create_jwt(struct Payload *payload) {
   }
 
   jwt_value_t user_name;
-  jwt_set_SET_STR(&user_name, "user_name", payload->user_name);
+  jwt_set_SET_STR(&user_name, "user_name", out->user_name);
   jwt_value_t avatar;
-  jwt_set_SET_STR(&avatar, "avatar", payload->avatar);
+  jwt_set_SET_STR(&avatar, "avatar", out->avatar);
   jwt_value_t iat;
   jwt_set_SET_INT(&iat, "iat", time(NULL));
   jwt_value_t iss;
@@ -71,7 +71,7 @@ char *create_jwt(struct Payload *payload) {
 }
 
 static int verify_callback(jwt_t *jwt, jwt_config_t *config) {
-  struct Payload *payload = (struct Payload *)config->ctx;
+  Payload *payload = (Payload *)config->ctx;
   jwt_value_t jval;
 
   jwt_set_GET_STR(&jval, "user_name");
@@ -87,7 +87,7 @@ static int verify_callback(jwt_t *jwt, jwt_config_t *config) {
   return 0;
 }
 
-struct Payload *verify_jwt(char *token) {
+Payload *verify_jwt(char *token) {
   jwt_t *jwt = NULL;
   jwt_checker_t *checker = jwt_checker_new();
 
@@ -96,7 +96,7 @@ struct Payload *verify_jwt(char *token) {
     return NULL;
   }
 
-  struct Payload *payload = malloc(sizeof(struct Payload));
+  Payload *payload = malloc(sizeof(Payload));
   payload->user_name = NULL;
   payload->avatar = NULL;
 

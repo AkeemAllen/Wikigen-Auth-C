@@ -1,4 +1,5 @@
 #include "db.h"
+#include "error.h"
 #include "log.h"
 #include "request_parser.h"
 #include "response_builder.h"
@@ -104,11 +105,14 @@ void *handle_client_request(void *arg) {
   }
   buffer[bytes_received] = '\0';
 
-  struct Request request;
-  RequestParserError error = parse_request(buffer, &request);
-  if (error != OK) {
-    LOG_ERROR("Failure Parsing Request: %s", strerror(errno));
-    send_response(client_fd, 400, CONTENT_TYPE_TEXT, "Failure Parsing Request");
+  Request request;
+  ErrorContext error = parse_request(buffer, &request);
+  if (error.code != OK) {
+    LOG_ERROR("Failure Parsing Request: %s", error.message);
+    char error_response[1024];
+    snprintf(error_response, sizeof(error_response),
+             "Failure Parsing Request: %s", error.message);
+    send_response(client_fd, 400, CONTENT_TYPE_TEXT, error_response);
     free(buffer);
     return NULL;
   }

@@ -2,11 +2,10 @@
 #include "log.h"
 #include "route_handlers.h"
 
-static struct RouteNode *g_router;
+static RouteNode *g_router;
 
-struct RouteNode *create_route_node(char *segment,
-                                    void (*handler)(int, struct Request *)) {
-  struct RouteNode *node = malloc(sizeof(struct RouteNode));
+RouteNode *create_route_node(char *segment, void (*handler)(int, Request *)) {
+  RouteNode *node = malloc(sizeof(RouteNode));
   node->segment = segment;
   node->children = NULL;
   node->child_count = 0;
@@ -16,12 +15,12 @@ struct RouteNode *create_route_node(char *segment,
   return node;
 }
 
-int add_child_route(struct RouteNode *parent, struct RouteNode *child) {
+int add_child_route(RouteNode *parent, RouteNode *child) {
   if (parent->child_count >= parent->child_capacity) {
     int new_capcity =
         parent->child_capacity == 0 ? 4 : parent->child_capacity * 2;
-    struct RouteNode **new_children =
-        realloc(parent->children, new_capcity * sizeof(struct RouteNode *));
+    RouteNode **new_children =
+        realloc(parent->children, new_capcity * sizeof(RouteNode *));
 
     if (new_children == NULL) {
       return -1;
@@ -36,7 +35,7 @@ int add_child_route(struct RouteNode *parent, struct RouteNode *child) {
   return 0;
 }
 
-struct RouteNode *find_route(struct RouteNode *node, char *segment) {
+RouteNode *find_route(RouteNode *node, char *segment) {
   if (node->segment == NULL) {
     return NULL;
   }
@@ -46,7 +45,7 @@ struct RouteNode *find_route(struct RouteNode *node, char *segment) {
   }
 
   for (int i = 0; i < (int)node->child_count; i++) {
-    struct RouteNode *child = find_route(node->children[i], segment);
+    RouteNode *child = find_route(node->children[i], segment);
     if (child != NULL) {
       return child;
     }
@@ -55,13 +54,13 @@ struct RouteNode *find_route(struct RouteNode *node, char *segment) {
   return NULL;
 }
 
-int route_request(int client_fd, struct Request *request) {
-  struct RouteNode *current_node = g_router;
+int route_request(int client_fd, Request *request) {
+  RouteNode *current_node = g_router;
   for (int i = 0; i < request->segment_count; i++) {
     current_node = find_route(current_node, request->segments[i]);
 
     if (current_node == NULL) {
-      LOG_ERROR("No route found for %s", request->segments[i]);
+      LOG_INFO("No route found for %s", request->segments[i]);
       return -1;
     }
 
@@ -75,11 +74,9 @@ int route_request(int client_fd, struct Request *request) {
 
 void init_routes() {
   g_router = create_route_node("", handle_root);
-  struct RouteNode *create_repo =
-      create_route_node("create_repo", handle_create_repo);
-  struct RouteNode *authorize =
-      create_route_node("authorize", handle_authorize);
-  struct RouteNode *test = create_route_node("test", handle_test);
+  RouteNode *create_repo = create_route_node("create_repo", handle_create_repo);
+  RouteNode *authorize = create_route_node("authorize", handle_authorize);
+  RouteNode *test = create_route_node("test", handle_test);
 
   add_child_route(g_router, create_repo);
   add_child_route(g_router, authorize);

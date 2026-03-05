@@ -57,12 +57,12 @@ char *get_query_string(char *buffer, int skip) {
   return query_string;
 }
 
-RequestParserError parse_request(char *buffer, struct Request *out) {
+ErrorContext parse_request(char *buffer, Request *out) {
   // Able to determine method from first two characters
   out->method = get_method(buffer[0], buffer[1]);
 
   if (strcmp(out->method, "") == 0) {
-    return INVALID_HTTP_METHOD;
+    return ERROR_CONTEXT(INVALID_HTTP_METHOD, "Invalid HTTP method");
   }
   int method_size = strlen(out->method) + WHITESPACE_SKIP;
 
@@ -106,7 +106,7 @@ RequestParserError parse_request(char *buffer, struct Request *out) {
 
     char *colon = strchr(header, ':');
     if (colon == NULL) {
-      return INVALID_HEADER;
+      return ERROR_CONTEXT(INVALID_HEADER, "Invalid header");
     }
     *colon = '\0';
     out->header_keys[out->header_count] = header;
@@ -132,5 +132,5 @@ RequestParserError parse_request(char *buffer, struct Request *out) {
   }
   free(url_path_copy);
 
-  return OK;
+  return ERROR_CONTEXT(OK, "OK");
 }

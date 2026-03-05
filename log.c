@@ -70,7 +70,7 @@ void log_write(LogLevel level, const char *file, int line, const char *fmt,
     fputc('\n', g_log_file);
   }
 
-  if (level == LOG_LEVEL_ERROR) {
+  if (level == LOG_LEVEL_ERROR || level == LOG_LEVEL_DEBUG) {
     fprintf(stderr, "[%s] [%s] %s:%d | ", ts, level_str, basename, line);
     va_list args;
     va_start(args, fmt);
