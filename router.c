@@ -74,7 +74,7 @@ int route_request(int client_fd, Request *request) {
 
 void init_routes() {
   g_router = create_route_node("", handle_root);
-  RouteNode *create_repo = create_route_node("create_repo", handle_create_repo);
+  RouteNode *create_repo = create_route_node("create-repo", handle_create_repo);
   RouteNode *authorize = create_route_node("authorize", handle_authorize);
   RouteNode *test = create_route_node("test", handle_test);
 
