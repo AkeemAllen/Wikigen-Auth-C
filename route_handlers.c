@@ -1,6 +1,7 @@
 #include "route_handlers.h"
 #include "error.h"
 #include "log.h"
+#include "response_builder.h"
 #include <string.h>
 
 // AI generated function
@@ -69,58 +70,18 @@ void handle_test(int client_fd, Request *request) {
   printf("Test\n");
 }
 
-ErrorContext get_existing_repo(char *user_name, char *wiki_name, char *data) {
-  libsql_connection_t conn = get_db_connection();
-  if (conn.err) {
-    LOG_ERROR("Failed to get database connection: %s\n",
-              libsql_error_message(conn.err));
-    return ERROR_CONTEXT(DATABASE_ERROR, "Failed to get database connection");
-  }
-
-  libsql_statement_t query_stmt =
-      libsql_connection_prepare(conn, "SELECT username, access_token FROM user "
-                                      "WHERE username = ? LIMIT 1");
-  libsql_statement_bind_value(query_stmt,
-                              libsql_text(user_name, strlen(user_name)));
-  if (query_stmt.err) {
-    LOG_ERROR("Error preparing query: %s\n",
-              libsql_error_message(query_stmt.err));
-    return ERROR_CONTEXT(DATABASE_ERROR, "Error preparing query");
-  }
-  libsql_rows_t rows = libsql_statement_query(query_stmt);
-  if (rows.err) {
-    LOG_ERROR("Error executing query: %s\n", libsql_error_message(rows.err));
-    return ERROR_CONTEXT(DATABASE_ERROR, "Error executing query");
-  }
-
-  libsql_row_t row;
-  row = libsql_rows_next(rows);
-  if (row.err) {
-    LOG_ERROR("Error retrieving row: %s\n", libsql_error_message(row.err));
-    return ERROR_CONTEXT(DATABASE_ERROR, "Error retrieving row");
-  }
-
-  if (libsql_row_empty(row)) {
-    LOG_ERROR("No record found for user %s", user_name);
-    return ERROR_CONTEXT(DB_NOT_FOUND, "No record found for user");
-  }
-
-  libsql_result_value_t username = libsql_row_value(row, 0);
-  libsql_result_value_t access_token = libsql_row_value(row, 1);
-
+ErrorContext get_existing_repo(char *user_name, char *wiki_name,
+                               char *access_token, char *data) {
   char existing_repo_url[512];
   snprintf(existing_repo_url, sizeof(existing_repo_url),
-           "https://api.github.com/repos/%s/%s",
-           (char *)username.ok.value.text.ptr, wiki_name);
-  LOG_DEBUG("Existing Repo URL: %s", existing_repo_url);
+           "https://api.github.com/repos/%s/%s", user_name, wiki_name);
   char headers[20][100];
   snprintf(headers[0], sizeof(headers[0]), "Accept: application/json");
   snprintf(headers[1], sizeof(headers[1]), "Authorization: Bearer ");
-  strncat(headers[1], access_token.ok.value.text.ptr,
-          strlen(access_token.ok.value.text.ptr) + 1);
+  strncat(headers[1], access_token, strlen(access_token) + 1);
   snprintf(headers[2], sizeof(headers[2]), "User-Agent: Wikigen-Auth-C");
 
-  char *response = perform_curl_request(existing_repo_url, "GET", headers);
+  char *response = perform_curl_request(existing_repo_url, "GET", headers, "");
   if (!response) {
     LOG_ERROR("Failed to perform request to %s", response);
     return ERROR_CONTEXT(REQUEST_ERROR, "Failed to perform request");
@@ -164,6 +125,57 @@ ErrorContext get_existing_repo(char *user_name, char *wiki_name, char *data) {
   return ERROR_CONTEXT(OK, "OK");
 }
 
+ErrorContext create_new_repo(char *user_name, char *wiki_name,
+                             char *access_token, char *data) {
+  char create_repo_url[512];
+  snprintf(create_repo_url, sizeof(create_repo_url),
+           "https://api.github.com/user/repos");
+  char headers[20][100];
+  snprintf(headers[0], sizeof(headers[0]), "Accept: application/json");
+  snprintf(headers[1], sizeof(headers[1]), "Authorization: Bearer ");
+  strncat(headers[1], access_token, strlen(access_token) + 1);
+  snprintf(headers[2], sizeof(headers[2]), "User-Agent: Wikigen-Auth-C");
+
+  char body[1024];
+  snprintf(body, sizeof(body), "{\"name\":\"%s\"}", wiki_name);
+
+  char *response = perform_curl_request(create_repo_url, "POST", headers, body);
+  if (!response) {
+    LOG_ERROR("Failed to perform request to %s", response);
+    return ERROR_CONTEXT(REQUEST_ERROR, "Failed to perform request");
+  }
+
+  cJSON *repo_json = cJSON_Parse(response);
+  if (repo_json == NULL) {
+    LOG_ERROR("Failed to parse JSON");
+    free(response);
+    return ERROR_CONTEXT(INVALID_JSON, "Failed to parse JSON");
+  }
+
+  cJSON *errors = cJSON_GetObjectItem(repo_json, "errors");
+  if (errors == NULL) {
+    strncpy(data, response, strlen(response));
+    data[strlen(response)] = '\0';
+    free(response);
+    return ERROR_CONTEXT(OK, "No response errors");
+  }
+
+  cJSON *ssh_url = cJSON_GetObjectItem(repo_json, "ssh_url");
+  if (ssh_url == NULL) {
+    LOG_ERROR("No SSH URL found");
+    free(response);
+    return ERROR_CONTEXT(INVALID_JSON, "No SSH URL found");
+  }
+
+  strncpy(data, ssh_url->valuestring, strlen(ssh_url->valuestring));
+  data[strlen(ssh_url->valuestring)] = '\0';
+
+  cJSON_Delete(repo_json);
+  free(response);
+
+  return ERROR_CONTEXT(OK, "OK");
+}
+
 void handle_create_repo(int client_fd, Request *request) {
   cJSON *json = cJSON_Parse(request->body);
   if (json == NULL) {
@@ -179,30 +191,97 @@ void handle_create_repo(int client_fd, Request *request) {
     return;
   }
 
+  libsql_connection_t conn = get_db_connection();
+  char db_error_response[1024];
+  if (conn.err) {
+    LOG_ERROR("Failed to get database connection: %s\n",
+              libsql_error_message(conn.err));
+    snprintf(db_error_response, sizeof(db_error_response),
+             "Failed to get database connection: %s",
+             libsql_error_message(conn.err));
+    send_response(client_fd, 500, CONTENT_TYPE_TEXT, db_error_response);
+    return;
+  }
+
+  libsql_statement_t query_stmt =
+      libsql_connection_prepare(conn, "SELECT username, access_token FROM user "
+                                      "WHERE username = ? LIMIT 1");
+  libsql_statement_bind_value(
+      query_stmt, libsql_text(payload->user_name, strlen(payload->user_name)));
+  if (query_stmt.err) {
+    LOG_ERROR("Error preparing query: %s\n",
+              libsql_error_message(query_stmt.err));
+    snprintf(db_error_response, sizeof(db_error_response),
+             "Error preparing query: %s", libsql_error_message(query_stmt.err));
+    send_response(client_fd, 500, CONTENT_TYPE_JSON, db_error_response);
+    return;
+  }
+  libsql_rows_t rows = libsql_statement_query(query_stmt);
+
+  if (rows.err) {
+    LOG_ERROR("Error executing query: %s\n", libsql_error_message(rows.err));
+    snprintf(db_error_response, sizeof(db_error_response),
+             "Error executing query: %s", libsql_error_message(rows.err));
+    send_response(client_fd, 500, CONTENT_TYPE_JSON, db_error_response);
+    return;
+  }
+
+  libsql_row_t row;
+  row = libsql_rows_next(rows);
+  if (row.err) {
+    LOG_ERROR("Error retrieving row: %s\n", libsql_error_message(row.err));
+    snprintf(db_error_response, sizeof(db_error_response),
+             "Error retrieving row: %s", libsql_error_message(row.err));
+    send_response(client_fd, 500, CONTENT_TYPE_JSON, db_error_response);
+    return;
+  }
+
+  if (libsql_row_empty(row)) {
+    LOG_ERROR("No record found for user %s", payload->user_name);
+    snprintf(db_error_response, sizeof(db_error_response),
+             "No record found for user %s", payload->user_name);
+    send_response(client_fd, 500, CONTENT_TYPE_JSON, db_error_response);
+    return;
+  }
+
+  libsql_result_value_t username = libsql_row_value(row, 0);
+  libsql_result_value_t access_token = libsql_row_value(row, 1);
+
   char data[2048];
   ErrorContext existing_repo_error =
-      get_existing_repo(payload->user_name, wiki_name->valuestring, data);
+      get_existing_repo(payload->user_name, wiki_name->valuestring,
+                        (char *)access_token.ok.value.text.ptr, data);
 
   char json_response[4096];
   if (existing_repo_error.code == NOT_FOUND) {
-    snprintf(json_response, sizeof(json_response),
-             "{\"message\": \"%s\", \"data\":%s}", existing_repo_error.message,
-             data);
-    send_response(client_fd, 400, CONTENT_TYPE_TEXT, json_response);
+    ErrorContext create_repo_error =
+        create_new_repo(payload->user_name, wiki_name->valuestring,
+                        (char *)access_token.ok.value.text.ptr, data);
+    if (create_repo_error.code == OK) {
+      if (strcmp(create_repo_error.message, "No response errors") == 0) {
+        send_response(client_fd, 200, CONTENT_TYPE_JSON, data);
+        return;
+      }
+
+      snprintf(json_response, sizeof(json_response), "{\"ssh_url\": \"%s\"}",
+               data);
+      send_response(client_fd, 400, CONTENT_TYPE_JSON, json_response);
+      return;
+    }
     return;
   }
 
   if (existing_repo_error.code == OK) {
     snprintf(json_response, sizeof(json_response), "{\"ssh_url\": \"%s\"}",
              data);
-    send_response(client_fd, 200, CONTENT_TYPE_TEXT, json_response);
+    send_response(client_fd, 200, CONTENT_TYPE_JSON, json_response);
     return;
   }
 
   if (existing_repo_error.code != OK) {
     snprintf(json_response, sizeof(json_response), "{\"message\": \"%s\"}",
              existing_repo_error.message);
-    send_response(client_fd, 400, CONTENT_TYPE_TEXT, json_response);
+    send_response(client_fd, 400, CONTENT_TYPE_JSON, json_response);
     return;
   }
 }
@@ -226,7 +305,7 @@ ErrorContext get_acces_token(AccessToken *out, char *code) {
   char headers[20][100];
   snprintf(headers[0], sizeof(headers[0]), "Accept: application/json");
 
-  char *response = perform_curl_request(githubOauthUrl, "POST", headers);
+  char *response = perform_curl_request(githubOauthUrl, "POST", headers, "");
   if (!response) {
     LOG_ERROR("Failed to perform request to %s", response);
     return ERROR_CONTEXT(REQUEST_ERROR, "Failed to perform request");
@@ -272,7 +351,7 @@ ErrorContext get_user_info(UserInfo *out, char *access_token) {
   strncat(headers[1], access_token, strlen(access_token) + 1);
   snprintf(headers[2], sizeof(headers[2]), "User-Agent: Wikigen-Auth-C");
 
-  char *response = perform_curl_request(githubUserUrl, "GET", headers);
+  char *response = perform_curl_request(githubUserUrl, "GET", headers, "");
   if (!response) {
     free(response);
     return ERROR_CONTEXT(REQUEST_ERROR, "Failed to perform request");

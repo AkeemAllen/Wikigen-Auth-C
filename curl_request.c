@@ -2,7 +2,7 @@
 #include "log.h"
 
 char *perform_curl_request(const char *url, const char *method,
-                           char received_headers[20][100]) {
+                           char received_headers[20][100], char *body) {
   Response response = {.data = malloc(1), .size = 0};
   if (response.data == NULL) {
     return NULL;
@@ -18,7 +18,7 @@ char *perform_curl_request(const char *url, const char *method,
   curl_easy_setopt(curl, CURLOPT_URL, url);
   if (strcmp(method, "POST") == 0) {
     curl_easy_setopt(curl, CURLOPT_POST, 1L);
-    curl_easy_setopt(curl, CURLOPT_POSTFIELDS, "");
+    curl_easy_setopt(curl, CURLOPT_POSTFIELDS, body);
   }
   curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_callback);
   curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
