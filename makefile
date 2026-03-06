@@ -21,7 +21,7 @@ $(BUILDDIR):
 	mkdir -p $(BUILDDIR)
 
 logs:
-	mkdir -p logs
+	mkdir -p logs && touch logs/wikigen_auth.log
 
 clean:
-	rm -rf $(BUILDDIR)
+	rm -rf $(BUILDDIR) && rm -rf logs
