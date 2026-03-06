@@ -2,7 +2,7 @@
 #include "log.h"
 
 char *perform_curl_request(const char *url, const char *method,
-                           char received_headers[20][100], char *body) {
+                           char received_headers[20][1048576], char *body) {
   Response response = {.data = malloc(1), .size = 0};
   if (response.data == NULL) {
     return NULL;

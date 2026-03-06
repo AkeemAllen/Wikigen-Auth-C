@@ -14,6 +14,8 @@
 #include "log.h"
 #include "response_builder.h"
 
+#define DEFAULT_SIZE 1048576
+
 void handle_root(int client_fd, Request *request);
 void handle_create_repo(int client_fd,Request *request);
 void handle_authorize(int client_fd,Request *request);

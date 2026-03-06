@@ -127,6 +127,11 @@ ErrorContext parse_request(char *buffer, Request *out) {
   while ((token = strsep(&url_path_copy, "/")) != NULL) {
     if (strlen(token) == 0)
       continue;
+    if (out->segment_count >= 255) {
+      return ERROR_CONTEXT(
+          INVALID_PAYLOAD,
+          "Too many segments: Number of path segments should not exceed 256");
+    }
     out->segments[out->segment_count] = token;
     out->segment_count++;
   }

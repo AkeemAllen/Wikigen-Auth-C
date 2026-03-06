@@ -4,7 +4,7 @@
 char *get_jwks() {
   FILE *file = fopen("JWKS.json", "r");
   if (file == NULL) {
-    printf("Failed to open JWKS.json file\n");
+    LOG_ERROR("Failed to open JWKS.json file");
     return NULL;
   }
 
@@ -20,6 +20,10 @@ char *get_jwks() {
     if (current_size + line_size + 1 > total_size) {
       total_size *= 2;
       jwks = realloc(jwks, total_size);
+      if (jwks == NULL) {
+        LOG_ERROR("Failed to realloc JWKS");
+        return NULL;
+      }
     }
 
     strcat(jwks, line);

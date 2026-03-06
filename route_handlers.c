@@ -75,16 +75,16 @@ ErrorContext get_existing_repo(char *user_name, char *wiki_name,
   char existing_repo_url[512];
   snprintf(existing_repo_url, sizeof(existing_repo_url),
            "https://api.github.com/repos/%s/%s", user_name, wiki_name);
-  char headers[20][100];
+  char headers[20][DEFAULT_SIZE];
   snprintf(headers[0], sizeof(headers[0]), "Accept: application/json");
-  snprintf(headers[1], sizeof(headers[1]), "Authorization: Bearer ");
-  strncat(headers[1], access_token, strlen(access_token) + 1);
+  snprintf(headers[1], sizeof(headers[1]), "Authorization: Bearer %s",
+           access_token);
   snprintf(headers[2], sizeof(headers[2]), "User-Agent: Wikigen-Auth-C");
 
   char *response = perform_curl_request(existing_repo_url, "GET", headers, "");
   if (!response) {
-    LOG_ERROR("Failed to perform request to %s", response);
-    return ERROR_CONTEXT(REQUEST_ERROR, "Failed to perform request");
+    return ERROR_CONTEXT(REQUEST_ERROR,
+                         "Failed to perform request for existing repo");
   }
 
   cJSON *repo_json = cJSON_Parse(response);
@@ -98,8 +98,8 @@ ErrorContext get_existing_repo(char *user_name, char *wiki_name,
   if (status != NULL) {
     if (strcmp(status->valuestring, "404") == 0 ||
         strcmp(status->valuestring, "403") == 0) {
-      strncpy(data, response, strlen(response));
-      data[strlen(response)] = '\0';
+      strncpy(data, response, sizeof(*data) - 1);
+      data[sizeof(*data) - 1] = '\0';
       free(response);
       LOG_ERROR("Failed to fetch existing repository");
       return ERROR_CONTEXT(NOT_FOUND, "Failed to fetch existing repository");
@@ -116,8 +116,8 @@ ErrorContext get_existing_repo(char *user_name, char *wiki_name,
     return ERROR_CONTEXT(INVALID_JSON, "No SSH URL found");
   }
 
-  strncpy(data, ssh_url->valuestring, strlen(ssh_url->valuestring));
-  data[strlen(ssh_url->valuestring)] = '\0';
+  strncpy(data, ssh_url->valuestring, sizeof(*data) - 1);
+  data[sizeof(*data) - 1] = '\0';
 
   cJSON_Delete(repo_json);
   free(response);
@@ -130,10 +130,10 @@ ErrorContext create_new_repo(char *user_name, char *wiki_name,
   char create_repo_url[512];
   snprintf(create_repo_url, sizeof(create_repo_url),
            "https://api.github.com/user/repos");
-  char headers[20][100];
+  char headers[20][DEFAULT_SIZE];
   snprintf(headers[0], sizeof(headers[0]), "Accept: application/json");
-  snprintf(headers[1], sizeof(headers[1]), "Authorization: Bearer ");
-  strncat(headers[1], access_token, strlen(access_token) + 1);
+  snprintf(headers[1], sizeof(headers[1]), "Authorization: Bearer %s",
+           access_token);
   snprintf(headers[2], sizeof(headers[2]), "User-Agent: Wikigen-Auth-C");
 
   char body[1024];
@@ -141,8 +141,8 @@ ErrorContext create_new_repo(char *user_name, char *wiki_name,
 
   char *response = perform_curl_request(create_repo_url, "POST", headers, body);
   if (!response) {
-    LOG_ERROR("Failed to perform request to %s", response);
-    return ERROR_CONTEXT(REQUEST_ERROR, "Failed to perform request");
+    return ERROR_CONTEXT(REQUEST_ERROR,
+                         "Failed to perform request to create repo");
   }
 
   cJSON *repo_json = cJSON_Parse(response);
@@ -154,8 +154,8 @@ ErrorContext create_new_repo(char *user_name, char *wiki_name,
 
   cJSON *errors = cJSON_GetObjectItem(repo_json, "errors");
   if (errors == NULL) {
-    strncpy(data, response, strlen(response));
-    data[strlen(response)] = '\0';
+    strncpy(data, response, sizeof(*data) - 1);
+    data[sizeof(*data) - 1] = '\0';
     free(response);
     return ERROR_CONTEXT(OK, "No response errors");
   }
@@ -167,8 +167,8 @@ ErrorContext create_new_repo(char *user_name, char *wiki_name,
     return ERROR_CONTEXT(INVALID_JSON, "No SSH URL found");
   }
 
-  strncpy(data, ssh_url->valuestring, strlen(ssh_url->valuestring));
-  data[strlen(ssh_url->valuestring)] = '\0';
+  strncpy(data, ssh_url->valuestring, sizeof(*data) - 1);
+  data[sizeof(*data) - 1] = '\0';
 
   cJSON_Delete(repo_json);
   free(response);
@@ -183,7 +183,18 @@ void handle_create_repo(int client_fd, Request *request) {
     return;
   }
   cJSON *token = cJSON_GetObjectItem(json, "token");
+  if (token == NULL) {
+    LOG_ERROR("Token is undefined");
+    send_response(client_fd, 400, CONTENT_TYPE_TEXT, "Token is undefined");
+    return;
+  }
+
   cJSON *wiki_name = cJSON_GetObjectItem(json, "wikiName");
+  if (wiki_name == NULL) {
+    LOG_ERROR("Wiki Name is undefined");
+    send_response(client_fd, 400, CONTENT_TYPE_TEXT, "Wiki name is undefined");
+    return;
+  }
 
   Payload *payload = verify_jwt(token->valuestring);
   if (payload == NULL) {
@@ -247,12 +258,12 @@ void handle_create_repo(int client_fd, Request *request) {
   libsql_result_value_t username = libsql_row_value(row, 0);
   libsql_result_value_t access_token = libsql_row_value(row, 1);
 
-  char data[2048];
+  char data[DEFAULT_SIZE];
   ErrorContext existing_repo_error =
       get_existing_repo(payload->user_name, wiki_name->valuestring,
                         (char *)access_token.ok.value.text.ptr, data);
 
-  char json_response[4096];
+  char json_response[DEFAULT_SIZE * 2];
   if (existing_repo_error.code == NOT_FOUND) {
     ErrorContext create_repo_error =
         create_new_repo(payload->user_name, wiki_name->valuestring,
@@ -302,7 +313,7 @@ ErrorContext get_acces_token(AccessToken *out, char *code) {
            "client_id=%s&client_secret=%s&code=%s",
            clientID, clientSecret, code);
 
-  char headers[20][100];
+  char headers[20][DEFAULT_SIZE];
   snprintf(headers[0], sizeof(headers[0]), "Accept: application/json");
 
   char *response = perform_curl_request(githubOauthUrl, "POST", headers, "");
@@ -345,10 +356,10 @@ ErrorContext get_user_info(UserInfo *out, char *access_token) {
   char githubUserUrl[512];
   snprintf(githubUserUrl, sizeof(githubUserUrl), "https://api.github.com/user");
 
-  char headers[20][100];
+  char headers[20][DEFAULT_SIZE];
   snprintf(headers[0], sizeof(headers[0]), "Accept: application/json");
-  snprintf(headers[1], sizeof(headers[1]), "Authorization: Bearer ");
-  strncat(headers[1], access_token, strlen(access_token) + 1);
+  snprintf(headers[1], sizeof(headers[1]), "Authorization: Bearer %s",
+           access_token);
   snprintf(headers[2], sizeof(headers[2]), "User-Agent: Wikigen-Auth-C");
 
   char *response = perform_curl_request(githubUserUrl, "GET", headers, "");

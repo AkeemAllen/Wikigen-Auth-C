@@ -14,7 +14,7 @@
 #include <unistd.h>
 
 #define PORT 8080
-#define BUFFER_SIZE 104857600
+#define BUFFER_SIZE 1048576
 #define METHOD_SIZE_GET 4
 
 void *handle_client_request(void *arg);
@@ -103,7 +103,7 @@ void *handle_client_request(void *arg) {
     free(buffer);
     return NULL;
   }
-  buffer[bytes_received] = '\0';
+  buffer[bytes_received - 1] = '\0';
 
   Request request;
   ErrorContext error = parse_request(buffer, &request);
