@@ -103,7 +103,7 @@ void *handle_client_request(void *arg) {
     free(buffer);
     return NULL;
   }
-  buffer[bytes_received - 1] = '\0';
+  buffer[bytes_received] = '\0';
 
   Request request;
   ErrorContext error = parse_request(buffer, &request);
@@ -123,7 +123,6 @@ void *handle_client_request(void *arg) {
     send_response(client_fd, 404, CONTENT_TYPE_TEXT, "No route found");
   }
   free(buffer);
-  printf("\n");
 
   return NULL;
 }

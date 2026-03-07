@@ -13,8 +13,10 @@
 #include "error.h"
 #include "log.h"
 #include "response_builder.h"
+#include "handler_helpers.h"
 
-#define DEFAULT_SIZE 1048576
+
+#define DEFAULT_SIZE 1048
 
 void handle_root(int client_fd, Request *request);
 void handle_create_repo(int client_fd,Request *request);

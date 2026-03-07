@@ -2,7 +2,7 @@
 #include "log.h"
 
 char *perform_curl_request(const char *url, const char *method,
-                           char received_headers[20][1048576], char *body) {
+                           char received_headers[5][1048], char *body) {
   Response response = {.data = malloc(1), .size = 0};
   if (response.data == NULL) {
     return NULL;
@@ -24,8 +24,8 @@ char *perform_curl_request(const char *url, const char *method,
   curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
 
   struct curl_slist *headers = NULL;
-  for (int i = 0; i < 20; i++) {
-    if (received_headers[i] == NULL) {
+  for (int i = 0; i < 5; i++) {
+    if (strlen(received_headers[i]) == 0) {
       break;
     }
     headers = curl_slist_append(headers, received_headers[i]);

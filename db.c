@@ -19,14 +19,7 @@ bool init_db() {
     return false;
   }
 
-  conn = libsql_database_connect(db);
-  if (conn.err) {
-    LOG_ERROR("Failed to connect to database: %s",
-              libsql_error_message(conn.err));
-    return false;
-  }
-
   return true;
 }
 
-libsql_connection_t get_db_connection() { return conn; }
+libsql_connection_t get_db_connection() { return libsql_database_connect(db); }

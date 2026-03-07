@@ -6,7 +6,7 @@
 #include <string.h>
 #include <sys/socket.h>
 #include "error.h"
-#define BUFFER_SIZE 104857600
+#define BUFFER_SIZE 1048576
 
 typedef struct {
     char *method;
