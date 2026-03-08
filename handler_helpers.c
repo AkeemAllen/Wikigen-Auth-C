@@ -195,9 +195,31 @@ ErrorContext get_acces_token(AccessToken *out, char *code) {
     return ERROR_CONTEXT(INVALID_JSON, "Failed to parse JSON");
   }
 
+  cJSON *error = cJSON_GetObjectItem(json, "error");
+  if (error != NULL) {
+    LOG_ERROR("Error retrieving access token: %s", error->valuestring);
+    free(response);
+    return ERROR_CONTEXT(INVALID_JSON, "Error retrieving access token");
+  }
+
   cJSON *access_token = cJSON_GetObjectItem(json, "access_token");
+  if (access_token == NULL) {
+    LOG_ERROR("No access token found");
+    free(response);
+    return ERROR_CONTEXT(INVALID_JSON, "No access token found");
+  }
   cJSON *token_type = cJSON_GetObjectItem(json, "token_type");
+  if (token_type == NULL) {
+    LOG_ERROR("No token type found");
+    free(response);
+    return ERROR_CONTEXT(INVALID_JSON, "No token type found");
+  }
   cJSON *scope = cJSON_GetObjectItem(json, "scope");
+  if (scope == NULL) {
+    LOG_ERROR("No scope found");
+    free(response);
+    return ERROR_CONTEXT(INVALID_JSON, "No scope found");
+  }
 
   if (access_token)
     out->access_token = strdup(access_token->valuestring);

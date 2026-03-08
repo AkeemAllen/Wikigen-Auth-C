@@ -94,13 +94,12 @@ int main(int argc, char *argv[]) {
 
 void *handle_client_request(void *arg) {
   int client_fd = *(int *)arg;
-  char *buffer = (char *)malloc(BUFFER_SIZE * sizeof(char));
+  char buffer[BUFFER_SIZE * sizeof(char)];
 
   ssize_t bytes_received = recv(client_fd, buffer, BUFFER_SIZE, 0);
 
   if (bytes_received < 0) {
     send_response(client_fd, 400, CONTENT_TYPE_TEXT, "Improper Header");
-    free(buffer);
     return NULL;
   }
   buffer[bytes_received] = '\0';
@@ -113,7 +112,6 @@ void *handle_client_request(void *arg) {
     snprintf(error_response, sizeof(error_response),
              "Failure Parsing Request: %s", error.message);
     send_response(client_fd, 400, CONTENT_TYPE_TEXT, error_response);
-    free(buffer);
     return NULL;
   }
 
@@ -122,7 +120,6 @@ void *handle_client_request(void *arg) {
   if (routed < 0) {
     send_response(client_fd, 404, CONTENT_TYPE_TEXT, "No route found");
   }
-  free(buffer);
 
   return NULL;
 }

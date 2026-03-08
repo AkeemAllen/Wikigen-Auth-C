@@ -29,9 +29,10 @@ void handle_create_repo(int client_fd, Request *request) {
     return;
   }
 
-  Payload *payload = verify_jwt(token->valuestring);
-  if (payload == NULL) {
-    send_response(client_fd, 401, CONTENT_TYPE_TEXT, "Failed to verify JWT");
+  Payload payload = {.user_name = "", .avatar = ""};
+  ErrorContext error = verify_jwt(token->valuestring, &payload);
+  if (error.code != OK) {
+    send_response(client_fd, 401, CONTENT_TYPE_TEXT, error.message);
     return;
   }
 
@@ -39,7 +40,7 @@ void handle_create_repo(int client_fd, Request *request) {
 
   char access_token[DEFAULT_SIZE];
   ErrorContext db_username_token_error =
-      get_user_name_and_token_from_db(payload->user_name, access_token);
+      get_user_name_and_token_from_db(payload.user_name, access_token);
   if (db_username_token_error.code != OK) {
     snprintf(json_response, sizeof(json_response), "{\"message\": \"%s\"}",
              db_username_token_error.message);
@@ -49,11 +50,11 @@ void handle_create_repo(int client_fd, Request *request) {
 
   char data[DEFAULT_SIZE * 10];
   ErrorContext existing_repo_error = get_existing_repo(
-      payload->user_name, wiki_name->valuestring, access_token, data);
+      payload.user_name, wiki_name->valuestring, access_token, data);
 
   if (existing_repo_error.code == NOT_FOUND) {
     ErrorContext create_repo_error = create_new_repo(
-        payload->user_name, wiki_name->valuestring, access_token, data);
+        payload.user_name, wiki_name->valuestring, access_token, data);
     if (create_repo_error.code == OK) {
       if (strcmp(create_repo_error.message, "No response errors") == 0) {
         send_response(client_fd, 200, CONTENT_TYPE_JSON, data);
@@ -84,16 +85,17 @@ void handle_create_repo(int client_fd, Request *request) {
 }
 
 void handle_authorize(int client_fd, Request *request) {
-  char *code = NULL;
+  char code[50];
   char error_response[512];
 
   for (int i = 0; i < request->param_count; i++) {
     if (strcmp(request->query_param_keys[i], "code") == 0) {
-      code = strdup(request->query_param_values[i]);
+      strncpy(code, request->query_param_values[i], 50);
+      code[50 - 1] = '\0';
     }
   }
 
-  if (code == NULL || strlen(code) == 0) {
+  if (strlen(code) == 0) {
     send_response(client_fd, 400, CONTENT_TYPE_TEXT,
                   "Code Parameter is undefined");
     return;
@@ -111,8 +113,8 @@ void handle_authorize(int client_fd, Request *request) {
   UserInfo user_info = {0};
   ErrorContext user_info_error = get_user_info(&user_info, token.access_token);
   if (user_info_error.code != OK) {
-    snprintf(error_response, sizeof(error_response),
-             "Error retrieving user info: %s", user_info_error.message);
+    snprintf(error_response, sizeof(error_response), "%s",
+             user_info_error.message);
     send_response(client_fd, 500, CONTENT_TYPE_TEXT, error_response);
     return;
   }
@@ -128,10 +130,15 @@ void handle_authorize(int client_fd, Request *request) {
   }
 
   Payload payload = {0};
-  payload.user_name = user_info.user_name;
-  payload.avatar = user_info.avatar;
+  strncpy(payload.user_name, user_info.user_name, sizeof(payload.user_name));
+  strncpy(payload.avatar, user_info.avatar, sizeof(payload.avatar));
 
-  char *created_token = create_jwt(&payload);
+  char created_token[1024];
+  ErrorContext error = create_jwt(&payload, created_token);
+  if (error.code != OK) {
+    send_response(client_fd, 500, CONTENT_TYPE_TEXT, error.message);
+    return;
+  }
 
   char *html = load_html_with_token(created_token);
   if (!html) {

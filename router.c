@@ -60,7 +60,7 @@ int route_request(int client_fd, Request *request) {
     current_node = find_route(current_node, request->segments[i]);
 
     if (current_node == NULL) {
-      LOG_INFO("No route found for %s", request->segments[i]);
+      LOG_DEBUG("No route found for %s", request->segments[i]);
       return -1;
     }
 

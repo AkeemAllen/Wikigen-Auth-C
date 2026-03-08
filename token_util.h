@@ -6,13 +6,14 @@
 #include <string.h>
 #include <jwt.h>
 #include "env.h"
+#include "error.h"
 
 typedef struct {
-  char *user_name;
-  char *avatar;
+  char user_name[100];
+  char avatar[100];
 } Payload;
 
-char *create_jwt(Payload *out);
-Payload *verify_jwt(char *token);
+ErrorContext create_jwt(Payload *payload, char *out);
+ErrorContext verify_jwt(char *token, Payload *out);
 
 #endif

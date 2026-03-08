@@ -1,4 +1,5 @@
 #include "token_util.h"
+#include "error.h"
 #include "log.h"
 
 char *get_jwks() {
@@ -33,18 +34,18 @@ char *get_jwks() {
   return jwks;
 }
 
-char *create_jwt(Payload *out) {
+ErrorContext create_jwt(Payload *payload, char *out) {
   jwt_builder_t *builder = jwt_builder_new();
 
   if (builder == NULL) {
     LOG_ERROR("Failed to create JWT builder");
-    return NULL;
+    return ERROR_CONTEXT(ERROR, "Failed to create JWT builder");
   }
 
   jwt_value_t user_name;
-  jwt_set_SET_STR(&user_name, "user_name", out->user_name);
+  jwt_set_SET_STR(&user_name, "user_name", payload->user_name);
   jwt_value_t avatar;
-  jwt_set_SET_STR(&avatar, "avatar", out->avatar);
+  jwt_set_SET_STR(&avatar, "avatar", payload->avatar);
   jwt_value_t iat;
   jwt_set_SET_INT(&iat, "iat", time(NULL));
   jwt_value_t iss;
@@ -68,10 +69,14 @@ char *create_jwt(Payload *out) {
 
   jwt_builder_setkey(builder, JWT_ALG_HS256, key);
 
-  char *token = jwt_builder_generate(builder);
+  char *generated_token = jwt_builder_generate(builder);
   jwt_builder_free(builder);
 
-  return token;
+  strncpy(out, generated_token, 1024);
+  out[1024 - 1] = '\0';
+  free(generated_token);
+
+  return ERROR_CONTEXT(OK, "OK");
 }
 
 static int verify_callback(jwt_t *jwt, jwt_config_t *config) {
@@ -80,29 +85,27 @@ static int verify_callback(jwt_t *jwt, jwt_config_t *config) {
 
   jwt_set_GET_STR(&jval, "user_name");
   if (jwt_claim_get(jwt, &jval) == JWT_VALUE_ERR_NONE && jval.str_val != NULL) {
-    payload->user_name = strdup(jval.str_val);
+    strncpy(payload->user_name, jval.str_val, sizeof(payload->user_name));
+    payload->user_name[sizeof(payload->user_name) - 1] = '\0';
   }
 
   jwt_set_GET_STR(&jval, "avatar");
   if (jwt_claim_get(jwt, &jval) == JWT_VALUE_ERR_NONE && jval.str_val != NULL) {
-    payload->avatar = strdup(jval.str_val);
+    strncpy(payload->avatar, jval.str_val, sizeof(payload->avatar));
+    payload->avatar[sizeof(payload->avatar) - 1] = '\0';
   }
 
   return 0;
 }
 
-Payload *verify_jwt(char *token) {
+ErrorContext verify_jwt(char *token, Payload *out) {
   jwt_t *jwt = NULL;
   jwt_checker_t *checker = jwt_checker_new();
 
   if (checker == NULL) {
     LOG_ERROR("Failed to create JWT checker");
-    return NULL;
+    return ERROR_CONTEXT(ERROR, "Failed to create JWT checker");
   }
-
-  Payload *payload = malloc(sizeof(Payload));
-  payload->user_name = NULL;
-  payload->avatar = NULL;
 
   char *jwt_secret = get_jwks();
 
@@ -110,18 +113,15 @@ Payload *verify_jwt(char *token) {
   const jwk_item_t *key = jwks_item_get(keys, 0);
 
   jwt_checker_setkey(checker, JWT_ALG_HS256, key);
-  jwt_checker_setcb(checker, verify_callback, payload);
+  jwt_checker_setcb(checker, verify_callback, out);
 
   int is_valid = jwt_checker_verify(checker, token);
   jwt_checker_free(checker);
 
   if (is_valid != 0) {
-    printf("JWT verification failed!\n");
-    free(payload->user_name);
-    free(payload->avatar);
-    free(payload);
-    return NULL;
+    return ERROR_CONTEXT(INVALID_TOKEN, "JWT verification failed!");
   }
+  free(jwt_secret);
 
-  return payload;
+  return ERROR_CONTEXT(OK, "OK");
 }

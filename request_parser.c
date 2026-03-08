@@ -1,90 +1,114 @@
 #include "request_parser.h"
 #define WHITESPACE_SKIP 1
 
-char *get_method(char first_char, char second_char) {
+void get_method(char first_char, char second_char, char *out) {
   if (first_char == 'G') {
-    return "GET";
+    strncpy(out, "GET", 3);
+    out[3] = '\0';
+    return;
   }
 
   if (first_char == 'D') {
-    return "DELETE";
+    strncpy(out, "DELETE", 6);
+    out[6] = '\0';
+    return;
   }
 
   if (first_char == 'P') {
     if (second_char == 'A') {
-      return "PATCH";
+      strncpy(out, "PATCH", 5);
+      out[5] = '\0';
+      return;
     }
     if (second_char == 'O') {
-      return "POST";
+      strncpy(out, "POST", 4);
+      out[4] = '\0';
+      return;
     }
     if (second_char == 'U') {
-      return "PUT";
+      strncpy(out, "PUT", 3);
+      out[3] = '\0';
+      return;
     }
   }
-
-  return "";
 }
 
-char *get_resource_path(char *buffer, int skip) {
-  char *resource_path = (char *)malloc(1024 * sizeof(char));
+void get_resource_path(char *buffer, int skip, char *out) {
   int buffer_size = strlen(buffer);
 
+  if (buffer_size >= 1024) {
+    LOG_ERROR("Buffer size is too large");
+    return;
+  }
   for (int i = skip; i < buffer_size; i++) {
     if (buffer[i] == ' ' || buffer[i] == '?') {
-      resource_path[i - skip] = '\0';
+      out[i - skip] = '\0';
       break;
     }
 
-    resource_path[i - skip] = buffer[i];
+    out[i - skip] = buffer[i];
   }
+  out[buffer_size - skip] = '\0';
 
-  return resource_path;
+  return;
 }
 
-char *get_query_string(char *buffer, int skip) {
-  char *query_string = (char *)malloc(1024 * sizeof(char));
+void get_query_string(char *buffer, int skip, char *out) {
   int buffer_size = strlen(buffer);
 
+  if (buffer_size >= 1024) {
+    LOG_ERROR("Query string is too large");
+    return;
+  }
   for (int i = skip; i < buffer_size; i++) {
     if (buffer[i] == ' ') {
-      query_string[i - skip] = '\0';
+      out[i - skip] = '\0';
       break;
     }
 
-    query_string[i - skip] = buffer[i];
+    out[i - skip] = buffer[i];
   }
+  out[buffer_size - skip] = '\0';
 
-  return query_string;
+  return;
 }
 
 ErrorContext parse_request(char *buffer, Request *out) {
   // Able to determine method from first two characters
-  out->method = get_method(buffer[0], buffer[1]);
-
+  get_method(buffer[0], buffer[1], out->method);
   if (strcmp(out->method, "") == 0) {
     return ERROR_CONTEXT(INVALID_HTTP_METHOD, "Invalid HTTP method");
   }
+
   int method_size = strlen(out->method) + WHITESPACE_SKIP;
 
-  out->resource_path = get_resource_path(buffer, method_size);
-  char *query_string =
-      get_query_string(buffer, strlen(out->resource_path) + method_size + 1);
+  get_resource_path(buffer, method_size, out->resource_path);
+  if (strlen(out->resource_path) == 0) {
+    return ERROR_CONTEXT(INVALID_PAYLOAD, "Invalid resource path");
+  }
+
+  char query_string[1024];
+  get_query_string(buffer, strlen(out->resource_path) + method_size + 1,
+                   query_string);
 
   if (strlen(query_string) > 0) {
     char *param;
+    char *temp_query_string = query_string;
     out->param_count = 0;
 
-    while ((param = strsep(&query_string, "&")) != NULL &&
+    while ((param = strsep(&temp_query_string, "&")) != NULL &&
            out->param_count < 32) {
       char *equals = strchr(param, '=');
       if (equals != NULL) {
         *equals = '\0';
-        out->query_param_keys[out->param_count] = param;
-        out->query_param_values[out->param_count] = equals + 1;
+        strncpy(out->query_param_keys[out->param_count], param, strlen(param));
+        out->query_param_keys[out->param_count][strlen(param)] = '\0';
+        strncpy(out->query_param_values[out->param_count], equals + 1,
+                strlen(equals + 1));
+        out->query_param_values[out->param_count][strlen(equals + 1)] = '\0';
         out->param_count++;
       }
     }
-    free(query_string);
   }
 
   char *header;
@@ -109,8 +133,11 @@ ErrorContext parse_request(char *buffer, Request *out) {
       return ERROR_CONTEXT(INVALID_HEADER, "Invalid header");
     }
     *colon = '\0';
-    out->header_keys[out->header_count] = header;
-    out->header_values[out->header_count] = colon + 1;
+    strncpy(out->header_keys[out->header_count], header, strlen(header));
+    out->header_keys[out->header_count][strlen(header)] = '\0';
+    strncpy(out->header_values[out->header_count], colon + 1,
+            strlen(colon + 1));
+    out->header_values[out->header_count][strlen(colon + 1)] = '\0';
     out->header_count++;
   }
 
@@ -118,7 +145,8 @@ ErrorContext parse_request(char *buffer, Request *out) {
     if (buffer[0] == '\n') {
       buffer++;
     }
-    out->body = buffer;
+    strncpy(out->body, buffer, strlen(buffer));
+    out->body[strlen(buffer)] = '\0';
   }
 
   char *token;
@@ -132,7 +160,8 @@ ErrorContext parse_request(char *buffer, Request *out) {
           INVALID_PAYLOAD,
           "Too many segments: Number of path segments should not exceed 256");
     }
-    out->segments[out->segment_count] = token;
+    strncpy(out->segments[out->segment_count], token, strlen(token));
+    out->segments[out->segment_count][strlen(token)] = '\0';
     out->segment_count++;
   }
   free(url_path_copy);
