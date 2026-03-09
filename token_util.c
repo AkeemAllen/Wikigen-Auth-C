@@ -119,7 +119,7 @@ ErrorContext verify_jwt(char *token, Payload *out) {
   jwt_checker_free(checker);
 
   if (is_valid != 0) {
-    return ERROR_CONTEXT(INVALID_TOKEN, "JWT verification failed!");
+    return ERROR_CONTEXT(INVALID_TOKEN, "Token Expire/Invalid");
   }
   free(jwt_secret);
 

@@ -29,14 +29,20 @@ void handle_create_repo(int client_fd, Request *request) {
     return;
   }
 
+  char json_response[DEFAULT_SIZE * 11];
+
   Payload payload = {.user_name = "", .avatar = ""};
   ErrorContext error = verify_jwt(token->valuestring, &payload);
+  if (error.code == INVALID_TOKEN) {
+    snprintf(json_response, sizeof(json_response),
+             "{\"message\": \"%s\", \"status\": %d}", error.message, 401);
+    send_response(client_fd, 401, CONTENT_TYPE_JSON, json_response);
+    return;
+  }
   if (error.code != OK) {
     send_response(client_fd, 401, CONTENT_TYPE_TEXT, error.message);
     return;
   }
-
-  char json_response[DEFAULT_SIZE * 11];
 
   char access_token[DEFAULT_SIZE];
   ErrorContext db_username_token_error =
