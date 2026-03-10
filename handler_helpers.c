@@ -1,27 +1,29 @@
 #include "handler_helpers.h"
+#include "log.h"
 
 ErrorContext insert_or_edit_user_access_token(UserInfo *user_info,
                                               char *access_token) {
+  LOG_INFO("Inserting or editing user access token");
   // Rule select query in turso
   libsql_connection_t conn = get_db_connection();
   if (conn.err) {
-    LOG_ERROR("Failed to get database connection: %s\n",
-              libsql_error_message(conn.err));
-    return ERROR_CONTEXT(DATABASE_ERROR, "Failed to get database connection");
+    return ERROR_CONTEXT(DATABASE_ERROR,
+                         "Failed to get database connection: %s\n",
+                         libsql_error_message(conn.err));
   }
 
   libsql_statement_t query_stmt =
       libsql_connection_prepare(conn, "SELECT * FROM user WHERE github_id = ?");
   libsql_statement_bind_value(query_stmt, libsql_integer(user_info->id));
   if (query_stmt.err) {
-    LOG_ERROR("Error preparing query: %s\n",
-              libsql_error_message(query_stmt.err));
-    return ERROR_CONTEXT(DATABASE_ERROR, "Error preparing query");
+    return ERROR_CONTEXT(DATABASE_ERROR, "Error preparing query: %s\n",
+                         libsql_error_message(query_stmt.err));
   }
 
   libsql_rows_t rows = libsql_statement_query(query_stmt);
   if (rows.err) {
-    LOG_ERROR("Error executing query: %s\n", libsql_error_message(rows.err));
+    return ERROR_CONTEXT(DATABASE_ERROR, "Error executing query: %s\n",
+                         libsql_error_message(rows.err));
   }
 
   libsql_row_t row;
@@ -32,9 +34,8 @@ ErrorContext insert_or_edit_user_access_token(UserInfo *user_info,
         update_stmt, libsql_text(access_token, strlen(access_token)));
     libsql_statement_bind_value(update_stmt, libsql_integer(user_info->id));
     if (update_stmt.err) {
-      LOG_ERROR("Error preparing query: %s\n",
-                libsql_error_message(update_stmt.err));
-      return ERROR_CONTEXT(DATABASE_ERROR, "Error preparing query");
+      return ERROR_CONTEXT(DATABASE_ERROR, "Error preparing query: %s\n",
+                           libsql_error_message(update_stmt.err));
     }
 
     libsql_statement_execute(update_stmt);
@@ -50,9 +51,8 @@ ErrorContext insert_or_edit_user_access_token(UserInfo *user_info,
     libsql_statement_bind_value(
         insert_stmt, libsql_text(access_token, strlen(access_token)));
     if (insert_stmt.err) {
-      LOG_ERROR("Error preparing query: %s\n",
-                libsql_error_message(insert_stmt.err));
-      return ERROR_CONTEXT(DATABASE_ERROR, "Error preparing query");
+      return ERROR_CONTEXT(DATABASE_ERROR, "Error preparing query: %s\n",
+                           libsql_error_message(insert_stmt.err));
     }
     libsql_statement_execute(insert_stmt);
     libsql_statement_deinit(insert_stmt);
@@ -65,6 +65,7 @@ ErrorContext insert_or_edit_user_access_token(UserInfo *user_info,
 
 ErrorContext get_existing_repo(char *user_name, char *wiki_name,
                                char *access_token, char *data) {
+  LOG_INFO("Getting existing repo for user %s", user_name);
   char existing_repo_url[512];
   snprintf(existing_repo_url, sizeof(existing_repo_url),
            "https://api.github.com/repos/%s/%s", user_name, wiki_name);
@@ -82,7 +83,6 @@ ErrorContext get_existing_repo(char *user_name, char *wiki_name,
 
   cJSON *repo_json = cJSON_Parse(response);
   if (repo_json == NULL) {
-    LOG_ERROR("Failed to parse JSON");
     free(response);
     return ERROR_CONTEXT(INVALID_JSON, "Failed to parse JSON");
   }
@@ -94,7 +94,6 @@ ErrorContext get_existing_repo(char *user_name, char *wiki_name,
       strncpy(data, response, DEFAULT_SIZE);
       data[DEFAULT_SIZE - 1] = '\0';
       free(response);
-      LOG_ERROR("Failed to fetch existing repository");
       return ERROR_CONTEXT(NOT_FOUND, "Failed to fetch existing repository");
     }
 
@@ -104,7 +103,6 @@ ErrorContext get_existing_repo(char *user_name, char *wiki_name,
 
   cJSON *ssh_url = cJSON_GetObjectItem(repo_json, "ssh_url");
   if (ssh_url == NULL) {
-    LOG_ERROR("No SSH URL found");
     free(response);
     return ERROR_CONTEXT(INVALID_JSON, "No SSH URL found");
   }
@@ -120,6 +118,7 @@ ErrorContext get_existing_repo(char *user_name, char *wiki_name,
 
 ErrorContext create_new_repo(char *user_name, char *wiki_name,
                              char *access_token, char *data) {
+  LOG_INFO("Creating new repo for user %s", user_name);
   char create_repo_url[512];
   snprintf(create_repo_url, sizeof(create_repo_url),
            "https://api.github.com/user/repos");
@@ -140,7 +139,6 @@ ErrorContext create_new_repo(char *user_name, char *wiki_name,
 
   cJSON *repo_json = cJSON_Parse(response);
   if (repo_json == NULL) {
-    LOG_ERROR("Failed to parse JSON");
     free(response);
     return ERROR_CONTEXT(INVALID_JSON, "Failed to parse JSON");
   }
@@ -155,7 +153,6 @@ ErrorContext create_new_repo(char *user_name, char *wiki_name,
 
   cJSON *ssh_url = cJSON_GetObjectItem(repo_json, "ssh_url");
   if (ssh_url == NULL) {
-    LOG_ERROR("No SSH URL found");
     free(response);
     return ERROR_CONTEXT(INVALID_JSON, "No SSH URL found");
   }
@@ -170,6 +167,7 @@ ErrorContext create_new_repo(char *user_name, char *wiki_name,
 }
 
 ErrorContext get_acces_token(AccessToken *out, char *code) {
+  LOG_INFO("Getting Access token");
   char *clientSecret = get_env_value("CLIENT_SECRET");
   char *clientID = get_env_value("CLIENT_ID");
 
@@ -191,32 +189,28 @@ ErrorContext get_acces_token(AccessToken *out, char *code) {
   cJSON *json = cJSON_Parse(response);
   if (json == NULL) {
     free(response);
-    LOG_ERROR("Failed to parse JSON");
     return ERROR_CONTEXT(INVALID_JSON, "Failed to parse JSON");
   }
 
   cJSON *error = cJSON_GetObjectItem(json, "error");
   if (error != NULL) {
-    LOG_ERROR("Error retrieving access token: %s", error->valuestring);
     free(response);
-    return ERROR_CONTEXT(INVALID_JSON, "Error retrieving access token");
+    return ERROR_CONTEXT(INVALID_JSON, "Error retrieving access token: %s",
+                         error->valuestring);
   }
 
   cJSON *access_token = cJSON_GetObjectItem(json, "access_token");
   if (access_token == NULL) {
-    LOG_ERROR("No access token found");
     free(response);
     return ERROR_CONTEXT(INVALID_JSON, "No access token found");
   }
   cJSON *token_type = cJSON_GetObjectItem(json, "token_type");
   if (token_type == NULL) {
-    LOG_ERROR("No token type found");
     free(response);
     return ERROR_CONTEXT(INVALID_JSON, "No token type found");
   }
   cJSON *scope = cJSON_GetObjectItem(json, "scope");
   if (scope == NULL) {
-    LOG_ERROR("No scope found");
     free(response);
     return ERROR_CONTEXT(INVALID_JSON, "No scope found");
   }
@@ -235,6 +229,7 @@ ErrorContext get_acces_token(AccessToken *out, char *code) {
 }
 
 ErrorContext get_user_info(UserInfo *out, char *access_token) {
+  LOG_INFO("Getting user info");
   char githubUserUrl[512];
   snprintf(githubUserUrl, sizeof(githubUserUrl), "https://api.github.com/user");
 
@@ -253,14 +248,25 @@ ErrorContext get_user_info(UserInfo *out, char *access_token) {
 
   cJSON *user_json = cJSON_Parse(response);
   if (user_json == NULL) {
-    LOG_ERROR("Failed to parse JSON");
     free(response);
     return ERROR_CONTEXT(INVALID_JSON, "Failed to parse JSON");
   }
 
   cJSON *user_id = cJSON_GetObjectItem(user_json, "id");
+  if (user_id == NULL) {
+    free(response);
+    return ERROR_CONTEXT(INVALID_JSON, "No user id found");
+  }
   cJSON *user_login = cJSON_GetObjectItem(user_json, "login");
+  if (user_login == NULL) {
+    free(response);
+    return ERROR_CONTEXT(INVALID_JSON, "No user login found");
+  }
   cJSON *user_avatar_url = cJSON_GetObjectItem(user_json, "avatar_url");
+  if (user_avatar_url == NULL) {
+    free(response);
+    return ERROR_CONTEXT(INVALID_JSON, "No user avatar url found");
+  }
 
   if (user_id)
     out->id = user_id->valueint;
@@ -277,12 +283,13 @@ ErrorContext get_user_info(UserInfo *out, char *access_token) {
 
 ErrorContext get_user_name_and_token_from_db(char *username,
                                              char *access_token) {
+  LOG_INFO("Getting user name and token from db for user %s", username);
   libsql_connection_t conn = get_db_connection();
   char db_error_response[1024];
   if (conn.err) {
-    LOG_ERROR("Failed to get database connection: %s\n",
-              libsql_error_message(conn.err));
-    return ERROR_CONTEXT(DATABASE_ERROR, "Failed to get database connection");
+    return ERROR_CONTEXT(DATABASE_ERROR,
+                         "Failed to get database connection: %s\n",
+                         libsql_error_message(conn.err));
   }
 
   libsql_statement_t query_stmt =
@@ -291,27 +298,25 @@ ErrorContext get_user_name_and_token_from_db(char *username,
   libsql_statement_bind_value(query_stmt,
                               libsql_text(username, strlen(username)));
   if (query_stmt.err) {
-    LOG_ERROR("Error preparing query: %s\n",
-              libsql_error_message(query_stmt.err));
-    return ERROR_CONTEXT(DATABASE_ERROR, "Error preparing query");
+    return ERROR_CONTEXT(DATABASE_ERROR, "Error preparing query: %s\n",
+                         libsql_error_message(query_stmt.err));
   }
   libsql_rows_t rows = libsql_statement_query(query_stmt);
 
   if (rows.err) {
-    LOG_ERROR("Error executing query: %s\n", libsql_error_message(rows.err));
-    return ERROR_CONTEXT(DATABASE_ERROR, "Error executing query");
+    return ERROR_CONTEXT(DATABASE_ERROR, "Error executing query: %s\n",
+                         libsql_error_message(rows.err));
   }
 
   libsql_row_t row;
   row = libsql_rows_next(rows);
   if (row.err) {
-    LOG_ERROR("Error retrieving row: %s\n", libsql_error_message(row.err));
-    return ERROR_CONTEXT(DATABASE_ERROR, "Error retrieving row");
+    return ERROR_CONTEXT(DATABASE_ERROR, "Error retrieving row: %s\n",
+                         libsql_error_message(row.err));
   }
 
   if (libsql_row_empty(row)) {
-    LOG_ERROR("No record found for user %s", username);
-    return ERROR_CONTEXT(NOT_FOUND, "No record found for user");
+    return ERROR_CONTEXT(NOT_FOUND, "No record found for user %s", username);
   }
 
   // libsql_result_value_t username = libsql_row_value(row, 0);

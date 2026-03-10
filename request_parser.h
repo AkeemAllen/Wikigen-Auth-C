@@ -9,6 +9,8 @@
 #include "log.h"
 #define BUFFER_SIZE 1048576
 
+typedef enum { GET, POST, OPTIONS, DELETE, PATCH, PUT } Method;
+
 typedef struct {
     char method[10];
     char resource_path[1024];

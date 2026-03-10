@@ -21,6 +21,5 @@
 void handle_root(int client_fd, Request *request);
 void handle_create_repo(int client_fd,Request *request);
 void handle_authorize(int client_fd,Request *request);
-void handle_test(int client_fd,  Request *request);
 
 #endif

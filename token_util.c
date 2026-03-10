@@ -35,10 +35,10 @@ char *get_jwks() {
 }
 
 ErrorContext create_jwt(Payload *payload, char *out) {
+  LOG_INFO("Creating JWT");
   jwt_builder_t *builder = jwt_builder_new();
 
   if (builder == NULL) {
-    LOG_ERROR("Failed to create JWT builder");
     return ERROR_CONTEXT(ERROR, "Failed to create JWT builder");
   }
 
@@ -75,11 +75,13 @@ ErrorContext create_jwt(Payload *payload, char *out) {
   strncpy(out, generated_token, 1024);
   out[1024 - 1] = '\0';
   free(generated_token);
+  LOG_INFO("Created JWT for user %s", payload->user_name);
 
   return ERROR_CONTEXT(OK, "OK");
 }
 
 static int verify_callback(jwt_t *jwt, jwt_config_t *config) {
+  LOG_INFO("Verifying Callback");
   Payload *payload = (Payload *)config->ctx;
   jwt_value_t jval;
 
@@ -94,16 +96,17 @@ static int verify_callback(jwt_t *jwt, jwt_config_t *config) {
     strncpy(payload->avatar, jval.str_val, sizeof(payload->avatar));
     payload->avatar[sizeof(payload->avatar) - 1] = '\0';
   }
+  LOG_INFO("Verified Callback");
 
   return 0;
 }
 
 ErrorContext verify_jwt(char *token, Payload *out) {
+  LOG_INFO("Verifying JWT");
   jwt_t *jwt = NULL;
   jwt_checker_t *checker = jwt_checker_new();
 
   if (checker == NULL) {
-    LOG_ERROR("Failed to create JWT checker");
     return ERROR_CONTEXT(ERROR, "Failed to create JWT checker");
   }
 
@@ -119,9 +122,10 @@ ErrorContext verify_jwt(char *token, Payload *out) {
   jwt_checker_free(checker);
 
   if (is_valid != 0) {
-    return ERROR_CONTEXT(INVALID_TOKEN, "Token Expire/Invalid");
+    return ERROR_CONTEXT(INVALID_TOKEN, "Token Expired/Invalid");
   }
   free(jwt_secret);
+  LOG_INFO("Verified JWT for user %s", out->user_name);
 
   return ERROR_CONTEXT(OK, "OK");
 }

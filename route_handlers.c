@@ -1,24 +1,22 @@
 #include "route_handlers.h"
+#include "log.h"
 
 void handle_root(int client_fd, Request *request) {
   send_response(client_fd, 200, CONTENT_TYPE_TEXT, "Welcome to Wikigen-Auth");
 }
 
-void handle_test(int client_fd, Request *request) {
-  send_response(client_fd, 200, CONTENT_TYPE_TEXT, "Test");
-  printf("Test\n");
-}
-
 void handle_create_repo(int client_fd, Request *request) {
   cJSON *json = cJSON_Parse(request->body);
   if (json == NULL) {
+    LOG_ERROR("Failed to parse JSON");
     send_response(client_fd, 400, CONTENT_TYPE_TEXT, "Failed to parse JSON");
     return;
   }
   cJSON *token = cJSON_GetObjectItem(json, "token");
   if (token == NULL) {
-    LOG_ERROR("Token is undefined");
-    send_response(client_fd, 400, CONTENT_TYPE_TEXT, "Token is undefined");
+    LOG_ERROR("Token value is undefined");
+    send_response(client_fd, 401, CONTENT_TYPE_TEXT,
+                  "Token value is undefined");
     return;
   }
 
@@ -36,10 +34,12 @@ void handle_create_repo(int client_fd, Request *request) {
   if (error.code == INVALID_TOKEN) {
     snprintf(json_response, sizeof(json_response),
              "{\"message\": \"%s\", \"status\": %d}", error.message, 401);
+    LOG_INFO("Invalid token response %s", json_response);
     send_response(client_fd, 401, CONTENT_TYPE_JSON, json_response);
     return;
   }
   if (error.code != OK) {
+    LOG_ERROR(error.message);
     send_response(client_fd, 401, CONTENT_TYPE_TEXT, error.message);
     return;
   }
@@ -50,6 +50,8 @@ void handle_create_repo(int client_fd, Request *request) {
   if (db_username_token_error.code != OK) {
     snprintf(json_response, sizeof(json_response), "{\"message\": \"%s\"}",
              db_username_token_error.message);
+    LOG_ERROR("Error getting username and toke: %s",
+              db_username_token_error.message);
     send_response(client_fd, 500, CONTENT_TYPE_JSON, json_response);
     return;
   }
@@ -69,6 +71,7 @@ void handle_create_repo(int client_fd, Request *request) {
 
       snprintf(json_response, sizeof(json_response), "{\"ssh_url\": \"%s\"}",
                data);
+      LOG_INFO("Repo already exists");
       send_response(client_fd, 400, CONTENT_TYPE_JSON, json_response);
       return;
     }
@@ -78,6 +81,7 @@ void handle_create_repo(int client_fd, Request *request) {
   if (existing_repo_error.code == OK) {
     snprintf(json_response, sizeof(json_response), "{\"ssh_url\": \"%s\"}",
              data);
+    LOG_INFO("Retrieved existing repo");
     send_response(client_fd, 200, CONTENT_TYPE_JSON, json_response);
     return;
   }
@@ -85,6 +89,7 @@ void handle_create_repo(int client_fd, Request *request) {
   if (existing_repo_error.code != OK) {
     snprintf(json_response, sizeof(json_response), "{\"message\": \"%s\"}",
              existing_repo_error.message);
+    LOG_ERROR("Error getting existing repo: %s", existing_repo_error.message);
     send_response(client_fd, 400, CONTENT_TYPE_JSON, json_response);
     return;
   }
@@ -102,6 +107,7 @@ void handle_authorize(int client_fd, Request *request) {
   }
 
   if (strlen(code) == 0) {
+    LOG_ERROR("Code Parameter is undefined");
     send_response(client_fd, 400, CONTENT_TYPE_TEXT,
                   "Code Parameter is undefined");
     return;
@@ -112,6 +118,7 @@ void handle_authorize(int client_fd, Request *request) {
   if (token_error.code != OK) {
     snprintf(error_response, sizeof(error_response),
              "Error retrieving access token: %s", token_error.message);
+    LOG_ERROR(error_response);
     send_response(client_fd, 500, CONTENT_TYPE_TEXT, error_response);
     return;
   }
@@ -121,6 +128,7 @@ void handle_authorize(int client_fd, Request *request) {
   if (user_info_error.code != OK) {
     snprintf(error_response, sizeof(error_response), "%s",
              user_info_error.message);
+    LOG_ERROR(error_response);
     send_response(client_fd, 500, CONTENT_TYPE_TEXT, error_response);
     return;
   }
@@ -131,6 +139,7 @@ void handle_authorize(int client_fd, Request *request) {
     snprintf(error_response, sizeof(error_response),
              "Error inserting or editing user, access token: %s",
              db_user_access_token_error.message);
+    LOG_ERROR(error_response);
     send_response(client_fd, 500, CONTENT_TYPE_TEXT, error_response);
     return;
   }
@@ -142,6 +151,7 @@ void handle_authorize(int client_fd, Request *request) {
   char created_token[1024];
   ErrorContext error = create_jwt(&payload, created_token);
   if (error.code != OK) {
+    LOG_ERROR(error.message);
     send_response(client_fd, 500, CONTENT_TYPE_TEXT, error.message);
     return;
   }

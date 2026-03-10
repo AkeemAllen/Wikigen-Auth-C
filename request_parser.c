@@ -1,36 +1,39 @@
 #include "request_parser.h"
 #define WHITESPACE_SKIP 1
 
-void get_method(char first_char, char second_char, char *out) {
-  if (first_char == 'G') {
-    strncpy(out, "GET", 3);
-    out[3] = '\0';
-    return;
+int get_method(char *buffer, char *out) {
+  char first_word[7];
+
+  size_t i = 0;
+  while (i < 7 && buffer[i] != ' ' && buffer[i] != '\0') {
+    first_word[i] = buffer[i];
+    i++;
+  }
+  first_word[i] = '\0';
+
+  strncpy(out, first_word, 10);
+  out[10 - 1] = '\0';
+
+  if (strcmp(out, "GET") == 0) {
+    return 0;
+  }
+  if (strcmp(out, "POST") == 0) {
+    return 0;
+  }
+  if (strcmp(out, "OPTIONS") == 0) {
+    return 0;
+  }
+  if (strcmp(out, "DELETE") == 0) {
+    return 0;
+  }
+  if (strcmp(out, "PATCH") == 0) {
+    return 0;
+  }
+  if (strcmp(out, "PUT") == 0) {
+    return 0;
   }
 
-  if (first_char == 'D') {
-    strncpy(out, "DELETE", 6);
-    out[6] = '\0';
-    return;
-  }
-
-  if (first_char == 'P') {
-    if (second_char == 'A') {
-      strncpy(out, "PATCH", 5);
-      out[5] = '\0';
-      return;
-    }
-    if (second_char == 'O') {
-      strncpy(out, "POST", 4);
-      out[4] = '\0';
-      return;
-    }
-    if (second_char == 'U') {
-      strncpy(out, "PUT", 3);
-      out[3] = '\0';
-      return;
-    }
-  }
+  return -1;
 }
 
 void get_resource_path(char *buffer, int skip, char *out) {
@@ -75,21 +78,24 @@ void get_query_string(char *buffer, int skip, char *out) {
 
 ErrorContext parse_request(char *buffer, Request *out) {
   // Able to determine method from first two characters
-  get_method(buffer[0], buffer[1], out->method);
-  if (strcmp(out->method, "") == 0) {
-    return ERROR_CONTEXT(INVALID_HTTP_METHOD, "Invalid HTTP method");
+  if (get_method(buffer, out->method) < 0) {
+    return ERROR_CONTEXT(INVALID_HTTP_METHOD, "Invalid HTTP method: %s",
+                         out->method);
   }
 
   int method_size = strlen(out->method) + WHITESPACE_SKIP;
 
   get_resource_path(buffer, method_size, out->resource_path);
   if (strlen(out->resource_path) == 0) {
-    return ERROR_CONTEXT(INVALID_PAYLOAD, "Invalid resource path");
+    return ERROR_CONTEXT(INVALID_PAYLOAD, "Resource Path %s", buffer);
   }
 
   char query_string[1024];
   get_query_string(buffer, strlen(out->resource_path) + method_size + 1,
                    query_string);
+
+  LOG_INFO("Request URL: %s %s?%s", out->method, out->resource_path,
+           query_string);
 
   if (strlen(query_string) > 0) {
     char *param;
@@ -130,7 +136,7 @@ ErrorContext parse_request(char *buffer, Request *out) {
 
     char *colon = strchr(header, ':');
     if (colon == NULL) {
-      return ERROR_CONTEXT(INVALID_HEADER, "Invalid header");
+      return ERROR_CONTEXT(INVALID_HEADER, "Invalid header %s", header);
     }
     *colon = '\0';
     strncpy(out->header_keys[out->header_count], header, strlen(header));

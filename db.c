@@ -5,6 +5,7 @@ libsql_database_t db;
 libsql_connection_t conn;
 
 bool init_db() {
+  LOG_INFO("Initializing database");
   libsql_setup((libsql_config_t){0});
 
   char *db_url = get_env_value("TURSO_DATABASE_URL");
@@ -18,6 +19,7 @@ bool init_db() {
               libsql_error_message(db.err));
     return false;
   }
+  LOG_INFO("Database initialized");
 
   return true;
 }

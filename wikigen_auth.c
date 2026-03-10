@@ -99,7 +99,7 @@ void *handle_client_request(void *arg) {
   ssize_t bytes_received = recv(client_fd, buffer, BUFFER_SIZE, 0);
 
   if (bytes_received < 0) {
-    send_response(client_fd, 400, CONTENT_TYPE_TEXT, "Improper Header");
+    send_response(client_fd, 400, CONTENT_TYPE_TEXT, "No bytes received");
     return NULL;
   }
   buffer[bytes_received] = '\0';
@@ -107,12 +107,26 @@ void *handle_client_request(void *arg) {
   Request request;
   ErrorContext error = parse_request(buffer, &request);
   if (error.code != OK) {
-    LOG_ERROR("Failure Parsing Request: %s", error.message);
     char error_response[1024];
     snprintf(error_response, sizeof(error_response),
              "Failure Parsing Request: %s", error.message);
+    LOG_ERROR(error_response);
     send_response(client_fd, 400, CONTENT_TYPE_TEXT, error_response);
     return NULL;
+  }
+
+  // Middleware?
+  if (strcmp(request.method, "OPTIONS") == 0) {
+    char response[1024];
+    snprintf(response, sizeof(response),
+             "HTTP/1.1 200 OK\r\n"
+             "Access-Control-Allow-Origin: *\r\n"
+             "Access-Control-Allow-Methods: GET, POST, OPTIONS\r\n"
+             "Access-Control-Allow-Headers: Content-Type\r\n"
+             "Content-Length: 0\r\n"
+             "Connection: keep-alive\r\n"
+             "\r\n");
+    send(client_fd, response, strlen(response), 0);
   }
 
   int routed = route_request(client_fd, &request);
