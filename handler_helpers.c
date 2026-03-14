@@ -144,11 +144,11 @@ ErrorContext create_new_repo(char *user_name, char *wiki_name,
   }
 
   cJSON *errors = cJSON_GetObjectItem(repo_json, "errors");
-  if (errors == NULL) {
+  if (errors != NULL) {
     strncpy(data, response, DEFAULT_SIZE * 10);
     data[(DEFAULT_SIZE * 10) - 1] = '\0';
     free(response);
-    return ERROR_CONTEXT(OK, "No response errors");
+    return ERROR_CONTEXT(ERROR, "Error creating repo");
   }
 
   cJSON *ssh_url = cJSON_GetObjectItem(repo_json, "ssh_url");

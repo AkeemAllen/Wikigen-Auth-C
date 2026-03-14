@@ -1,5 +1,6 @@
 #include "route_handlers.h"
 #include "log.h"
+#include <stdio.h>
 
 void handle_root(int client_fd, Request *request) {
   send_response(client_fd, 200, CONTENT_TYPE_TEXT, "Welcome to Wikigen-Auth");
@@ -7,8 +8,9 @@ void handle_root(int client_fd, Request *request) {
 
 void handle_create_repo(int client_fd, Request *request) {
   cJSON *json = cJSON_Parse(request->body);
+  printf("JSON %s", request->body);
   if (json == NULL) {
-    LOG_ERROR("Failed to parse JSON");
+    LOG_ERROR("Failed to parse JSON from request body: %s", request->body);
     send_response(client_fd, 400, CONTENT_TYPE_TEXT, "Failed to parse JSON");
     return;
   }
@@ -64,15 +66,31 @@ void handle_create_repo(int client_fd, Request *request) {
     ErrorContext create_repo_error = create_new_repo(
         payload.user_name, wiki_name->valuestring, access_token, data);
     if (create_repo_error.code == OK) {
-      if (strcmp(create_repo_error.message, "No response errors") == 0) {
-        send_response(client_fd, 200, CONTENT_TYPE_JSON, data);
-        return;
-      }
-
       snprintf(json_response, sizeof(json_response), "{\"ssh_url\": \"%s\"}",
                data);
-      LOG_INFO("Repo already exists");
-      send_response(client_fd, 400, CONTENT_TYPE_JSON, json_response);
+
+      char origin[512];
+      for (int i = 0; i < request->header_count; i++) {
+        if (strcmp(request->header_keys[i], "Origin") == 0) {
+          strncpy(origin, request->header_values[i], 512);
+          origin[512 - 1] = '\0';
+          break;
+        }
+      }
+      printf("Origin: %s", origin);
+
+      char response[8192];
+      int written = snprintf(response, sizeof(response),
+                             "HTTP/1.1 200 OK\r\n"
+                             "Content-Type: application/json\r\n"
+                             "Access-Control-Allow-Origin: %s\r\n"
+                             "Content-Length: %d\r\n"
+                             "Connection: close\r\n"
+                             "\r\n"
+                             "%s",
+                             origin, (int)strlen(json_response), json_response);
+
+      send(client_fd, response, (size_t)written, 0);
       return;
     }
     return;
@@ -82,7 +100,28 @@ void handle_create_repo(int client_fd, Request *request) {
     snprintf(json_response, sizeof(json_response), "{\"ssh_url\": \"%s\"}",
              data);
     LOG_INFO("Retrieved existing repo");
-    send_response(client_fd, 200, CONTENT_TYPE_JSON, json_response);
+    char origin[512];
+    for (int i = 0; i < request->header_count; i++) {
+      if (strcmp(request->header_keys[i], "Origin") == 0) {
+        strncpy(origin, request->header_values[i], 512);
+        origin[512 - 1] = '\0';
+        break;
+      }
+    }
+    printf("Origin: %s", origin);
+
+    char response[8192];
+    int written = snprintf(response, sizeof(response),
+                           "HTTP/1.1 200 OK\r\n"
+                           "Content-Type: application/json\r\n"
+                           "Access-Control-Allow-Origin: %s\r\n"
+                           "Content-Length: %d\r\n"
+                           "Connection: close\r\n"
+                           "\r\n"
+                           "%s",
+                           origin, (int)strlen(json_response), json_response);
+    // send_response(client_fd, 200, CONTENT_TYPE_JSON, json_response);
+    send(client_fd, response, (size_t)written, 0);
     return;
   }
 

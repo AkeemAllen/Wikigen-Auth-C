@@ -95,16 +95,45 @@ int main(int argc, char *argv[]) {
 void *handle_client_request(void *arg) {
   int client_fd = *(int *)arg;
   char buffer[BUFFER_SIZE * sizeof(char)];
+  int total_bytes_received = 0;
 
-  ssize_t bytes_received = recv(client_fd, buffer, BUFFER_SIZE, 0);
+  int bytes_received;
+  while ((bytes_received = recv(client_fd, buffer + total_bytes_received,
+                                sizeof(buffer) - total_bytes_received - 1, 0)) >
+         0) {
+    total_bytes_received += bytes_received;
+    buffer[total_bytes_received] = '\0';
+
+    char *buffer_start = strstr(buffer, "\r\n\r\n");
+    if (buffer_start) {
+      int body_start_index = (buffer_start - buffer) + 4;
+
+      char *content_length = strcasestr(buffer, "Content-Length:");
+      if (content_length) {
+        int content_length_int = atoi(content_length + 15);
+
+        int body_received = total_bytes_received - body_start_index;
+        while (body_received < content_length_int) {
+          bytes_received = recv(client_fd, buffer + total_bytes_received,
+                                sizeof(buffer) - total_bytes_received - 1, 0);
+          if (bytes_received <= 0)
+            break;
+          body_received += bytes_received;
+          total_bytes_received += bytes_received;
+        }
+        buffer[total_bytes_received] = '\0';
+      }
+      break;
+    }
+  }
 
   if (bytes_received < 0) {
     send_response(client_fd, 400, CONTENT_TYPE_TEXT, "No bytes received");
     return NULL;
   }
-  buffer[bytes_received] = '\0';
 
   Request request;
+  LOG_INFO("Received request: %s", buffer);
   ErrorContext error = parse_request(buffer, &request);
   if (error.code != OK) {
     char error_response[1024];
@@ -113,6 +142,24 @@ void *handle_client_request(void *arg) {
     LOG_ERROR(error_response);
     send_response(client_fd, 400, CONTENT_TYPE_TEXT, error_response);
     return NULL;
+  }
+
+  char content_length[512];
+  for (int i = 0; i < request.header_count; i++) {
+    if (strcmp(request.header_keys[i], "Content-Length") == 0) {
+      strncpy(content_length, request.header_values[i], 512);
+      content_length[512 - 1] = '\0';
+      break;
+    }
+  }
+
+  int content_length_int = atoi(content_length + 15);
+  if (content_length_int > 0) {
+    char body[content_length_int];
+    while (recv(client_fd, body, content_length_int, 0) > 0) {
+      body[content_length_int] = '\0';
+    }
+    LOG_INFO("Received body: %s", body);
   }
 
   // Middleware?
@@ -124,8 +171,8 @@ void *handle_client_request(void *arg) {
              "Access-Control-Allow-Methods: GET, POST, OPTIONS\r\n"
              "Access-Control-Allow-Headers: Content-Type\r\n"
              "Content-Length: 0\r\n"
-             "Connection: keep-alive\r\n"
-             "\r\n");
+             "Connection: keep-alive\r\n");
+    LOG_INFO("Sending response: %s", response);
     send(client_fd, response, strlen(response), 0);
   }
 

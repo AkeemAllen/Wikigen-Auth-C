@@ -94,8 +94,7 @@ ErrorContext parse_request(char *buffer, Request *out) {
   get_query_string(buffer, strlen(out->resource_path) + method_size + 1,
                    query_string);
 
-  LOG_INFO("Request URL: %s %s?%s", out->method, out->resource_path,
-           query_string);
+  LOG_INFO("Request URL: %s %s", out->method, out->resource_path);
 
   if (strlen(query_string) > 0) {
     char *param;
@@ -115,6 +114,11 @@ ErrorContext parse_request(char *buffer, Request *out) {
         out->param_count++;
       }
     }
+  }
+
+  for (int i = 0; i < out->param_count; i++) {
+    LOG_INFO("Param %s: %s", out->query_param_keys[i],
+             out->query_param_values[i]);
   }
 
   char *header;
