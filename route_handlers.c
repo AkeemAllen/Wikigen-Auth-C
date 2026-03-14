@@ -62,6 +62,16 @@ void handle_create_repo(int client_fd, Request *request) {
   ErrorContext existing_repo_error = get_existing_repo(
       payload.user_name, wiki_name->valuestring, access_token, data);
 
+  char origin[512];
+  for (int i = 0; i < request->header_count; i++) {
+    if (strcmp(request->header_keys[i], "Origin") == 0) {
+      strncpy(origin, request->header_values[i], 512);
+      origin[512 - 1] = '\0';
+      break;
+    }
+  }
+
+  char response[8192];
   if (existing_repo_error.code == NOT_FOUND) {
     ErrorContext create_repo_error = create_new_repo(
         payload.user_name, wiki_name->valuestring, access_token, data);
@@ -69,17 +79,7 @@ void handle_create_repo(int client_fd, Request *request) {
       snprintf(json_response, sizeof(json_response), "{\"ssh_url\": \"%s\"}",
                data);
 
-      char origin[512];
-      for (int i = 0; i < request->header_count; i++) {
-        if (strcmp(request->header_keys[i], "Origin") == 0) {
-          strncpy(origin, request->header_values[i], 512);
-          origin[512 - 1] = '\0';
-          break;
-        }
-      }
-      printf("Origin: %s", origin);
-
-      char response[8192];
+      // TODO: Clean this up
       int written = snprintf(response, sizeof(response),
                              "HTTP/1.1 200 OK\r\n"
                              "Content-Type: application/json\r\n"
@@ -100,17 +100,8 @@ void handle_create_repo(int client_fd, Request *request) {
     snprintf(json_response, sizeof(json_response), "{\"ssh_url\": \"%s\"}",
              data);
     LOG_INFO("Retrieved existing repo");
-    char origin[512];
-    for (int i = 0; i < request->header_count; i++) {
-      if (strcmp(request->header_keys[i], "Origin") == 0) {
-        strncpy(origin, request->header_values[i], 512);
-        origin[512 - 1] = '\0';
-        break;
-      }
-    }
-    printf("Origin: %s", origin);
 
-    char response[8192];
+    // TODO: Clean this up
     int written = snprintf(response, sizeof(response),
                            "HTTP/1.1 200 OK\r\n"
                            "Content-Type: application/json\r\n"
@@ -120,7 +111,6 @@ void handle_create_repo(int client_fd, Request *request) {
                            "\r\n"
                            "%s",
                            origin, (int)strlen(json_response), json_response);
-    // send_response(client_fd, 200, CONTENT_TYPE_JSON, json_response);
     send(client_fd, response, (size_t)written, 0);
     return;
   }
@@ -128,8 +118,20 @@ void handle_create_repo(int client_fd, Request *request) {
   if (existing_repo_error.code != OK) {
     snprintf(json_response, sizeof(json_response), "{\"message\": \"%s\"}",
              existing_repo_error.message);
+
+    // TODO: Clean this up
+    int written = snprintf(response, sizeof(response),
+                           "HTTP/1.1 200 OK\r\n"
+                           "Content-Type: application/json\r\n"
+                           "Access-Control-Allow-Origin: %s\r\n"
+                           "Content-Length: %d\r\n"
+                           "Connection: close\r\n"
+                           "\r\n"
+                           "%s",
+                           origin, (int)strlen(json_response), json_response);
+
     LOG_ERROR("Error getting existing repo: %s", existing_repo_error.message);
-    send_response(client_fd, 400, CONTENT_TYPE_JSON, json_response);
+    send(client_fd, response, (size_t)written, 0);
     return;
   }
 }

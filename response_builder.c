@@ -59,6 +59,7 @@ int send_response(int client_fd, int status_code, ContentType content_type,
     const char *fallback = "HTTP/1.1 500 Internal Server Error\r\n"
                            "Content-Type: text/plain\r\n"
                            "Content-Length: 19\r\n"
+                           "Access-Control-Allow-Origin: *\r\n"
                            "Connection: close\r\n"
                            "\r\n"
                            "Response too large.";
