@@ -169,9 +169,9 @@ void *handle_client_request(void *arg) {
              "HTTP/1.1 200 OK\r\n"
              "Access-Control-Allow-Origin: *\r\n"
              "Access-Control-Allow-Methods: GET, POST, OPTIONS\r\n"
-             "Access-Control-Allow-Headers: Content-Type\r\n"
+             "Access-Control-Allow-Headers: *\r\n"
              "Content-Length: 0\r\n"
-             "Connection: keep-alive\r\n");
+             "Connection: keep-alive\r\n\r\n");
     LOG_INFO("Sending response: %s", response);
     send(client_fd, response, strlen(response), 0);
   }

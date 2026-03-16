@@ -64,7 +64,7 @@ void handle_create_repo(int client_fd, Request *request) {
 
   char origin[512];
   for (int i = 0; i < request->header_count; i++) {
-    if (strcmp(request->header_keys[i], "Origin") == 0) {
+    if (strcmp(request->header_keys[i], "origin") == 0) {
       strncpy(origin, request->header_values[i], 512);
       origin[512 - 1] = '\0';
       break;
@@ -84,6 +84,8 @@ void handle_create_repo(int client_fd, Request *request) {
                              "HTTP/1.1 200 OK\r\n"
                              "Content-Type: application/json\r\n"
                              "Access-Control-Allow-Origin: %s\r\n"
+                             "Access-Control-Allow-Methods: POST, OPTIONS\r\n"
+                             "Access-Control-Allow-Headers: Content-Type\r\n"
                              "Content-Length: %d\r\n"
                              "Connection: close\r\n"
                              "\r\n"
@@ -102,15 +104,18 @@ void handle_create_repo(int client_fd, Request *request) {
     LOG_INFO("Retrieved existing repo");
 
     // TODO: Clean this up
-    int written = snprintf(response, sizeof(response),
-                           "HTTP/1.1 200 OK\r\n"
-                           "Content-Type: application/json\r\n"
-                           "Access-Control-Allow-Origin: %s\r\n"
-                           "Content-Length: %d\r\n"
-                           "Connection: close\r\n"
-                           "\r\n"
-                           "%s",
-                           origin, (int)strlen(json_response), json_response);
+    int written =
+        snprintf(response, sizeof(response),
+                 "HTTP/1.1 200 OK\r\n"
+                 "Content-Type: application/json\r\n"
+                 "Access-Control-Allow-Origin: %s\r\n"
+                 "Access-Control-Allow-Methods: GET, POST, OPTIONS\r\n"
+                 "Access-Control-Allow-Headers: *\r\n"
+                 "Content-Length: %d\r\n"
+                 "Connection: close\r\n"
+                 "\r\n"
+                 "%s",
+                 origin, (int)strlen(json_response), json_response);
     send(client_fd, response, (size_t)written, 0);
     return;
   }
@@ -120,15 +125,18 @@ void handle_create_repo(int client_fd, Request *request) {
              existing_repo_error.message);
 
     // TODO: Clean this up
-    int written = snprintf(response, sizeof(response),
-                           "HTTP/1.1 200 OK\r\n"
-                           "Content-Type: application/json\r\n"
-                           "Access-Control-Allow-Origin: %s\r\n"
-                           "Content-Length: %d\r\n"
-                           "Connection: close\r\n"
-                           "\r\n"
-                           "%s",
-                           origin, (int)strlen(json_response), json_response);
+    int written =
+        snprintf(response, sizeof(response),
+                 "HTTP/1.1 200 OK\r\n"
+                 "Content-Type: application/json\r\n"
+                 "Access-Control-Allow-Origin: %s\r\n"
+                 "Access-Control-Allow-Methods: GET, POST, OPTIONS\r\n"
+                 "Access-Control-Allow-Headers: *\r\n"
+                 "Content-Length: %d\r\n"
+                 "Connection: close\r\n"
+                 "\r\n"
+                 "%s",
+                 origin, (int)strlen(json_response), json_response);
 
     LOG_ERROR("Error getting existing repo: %s", existing_repo_error.message);
     send(client_fd, response, (size_t)written, 0);

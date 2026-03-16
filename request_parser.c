@@ -39,10 +39,6 @@ int get_method(char *buffer, char *out) {
 void get_resource_path(char *buffer, int skip, char *out) {
   int buffer_size = strlen(buffer);
 
-  if (buffer_size >= 1024) {
-    LOG_ERROR("Buffer size is too large");
-    return;
-  }
   for (int i = skip; i < buffer_size; i++) {
     if (buffer[i] == ' ' || buffer[i] == '?') {
       out[i - skip] = '\0';
@@ -59,10 +55,6 @@ void get_resource_path(char *buffer, int skip, char *out) {
 void get_query_string(char *buffer, int skip, char *out) {
   int buffer_size = strlen(buffer);
 
-  if (buffer_size >= 1024) {
-    LOG_ERROR("Query string is too large");
-    return;
-  }
   for (int i = skip; i < buffer_size; i++) {
     if (buffer[i] == ' ') {
       out[i - skip] = '\0';
