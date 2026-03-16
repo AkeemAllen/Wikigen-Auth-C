@@ -8,7 +8,6 @@ void handle_root(int client_fd, Request *request) {
 
 void handle_create_repo(int client_fd, Request *request) {
   cJSON *json = cJSON_Parse(request->body);
-  printf("JSON %s", request->body);
   if (json == NULL) {
     LOG_ERROR("Failed to parse JSON from request body: %s", request->body);
     send_response(client_fd, 400, CONTENT_TYPE_TEXT, "Failed to parse JSON");
